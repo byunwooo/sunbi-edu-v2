@@ -63,14 +63,18 @@ export default function DashboardPage() {
           <p className="text-[13px] mt-1" style={{ color: "rgba(255,255,255,0.7)" }}>지점별 교육 내용 및 평가 기록</p>
         </Link>
 
-        <div className="grid grid-cols-2 gap-3 mb-8">
+        <div className="grid grid-cols-3 gap-3 mb-8">
           <Link href="/branches" className="block bg-white rounded-2xl p-5 border shadow-sm hover:shadow-md transition-shadow no-underline" style={{ borderColor: "var(--border-light)" }}>
             <h3 className="text-[15px] font-bold" style={{ color: "var(--text)" }}>지점 관리</h3>
-            <p className="text-xs mt-1" style={{ color: "var(--text-muted)" }}>등록 및 목록 관리</p>
+            <p className="text-xs mt-1" style={{ color: "var(--text-muted)" }}>등록 및 목록</p>
           </Link>
           <Link href="/overview" className="block bg-white rounded-2xl p-5 border shadow-sm hover:shadow-md transition-shadow no-underline" style={{ borderColor: "var(--border-light)" }}>
             <h3 className="text-[15px] font-bold" style={{ color: "var(--text)" }}>전체 현황</h3>
             <p className="text-xs mt-1" style={{ color: "var(--text-muted)" }}>진행률 & 분석</p>
+          </Link>
+          <Link href="/analysis" className="block rounded-2xl p-5 border shadow-sm hover:shadow-md transition-shadow no-underline" style={{ borderColor: "var(--primary)", background: "rgba(139,26,26,0.05)" }}>
+            <h3 className="text-[15px] font-bold" style={{ color: "var(--primary)" }}>AI 분석</h3>
+            <p className="text-xs mt-1" style={{ color: "var(--text-muted)" }}>교육 인사이트</p>
           </Link>
         </div>
 
