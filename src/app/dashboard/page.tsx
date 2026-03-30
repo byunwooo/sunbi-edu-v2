@@ -75,12 +75,32 @@ export default function DashboardPage() {
         </div>
 
         {/* 교육 현황 */}
-        <div className="flex items-center justify-between mb-4">
-          <h2 className="text-[15px] font-bold">현재 교육 현황</h2>
-          <span className="text-xs font-semibold px-2 py-0.5 rounded-full" style={{ background: "rgba(139,26,26,0.1)", color: "var(--primary)" }}>{branches.length}개 지점</span>
-        </div>
+        {(() => {
+          const inProgressBranches = branches.filter(branch => {
+            const branchRecords = records.filter(r => r.branch_id === branch.id);
+            const completedSteps = new Set(branchRecords.filter(r => r.passed).map(r => r.step)).size;
+            return Math.round((completedSteps / CURRICULUM_STEPS.length) * 100) < 100;
+          });
+          return (
+            <>
+              <div className="flex items-center justify-between mb-4">
+                <h2 className="text-[15px] font-bold">현재 교육 현황</h2>
+                <span className="text-xs font-semibold px-2 py-0.5 rounded-full" style={{ background: "rgba(139,26,26,0.1)", color: "var(--primary)" }}>{inProgressBranches.length}개 지점 진행 중</span>
+              </div>
+              {inProgressBranches.length === 0 && (
+                <div className="text-center py-10">
+                  <p className="text-sm" style={{ color: "var(--text-muted)" }}>진행 중인 교육이 없습니다</p>
+                </div>
+              )}
+            </>
+          );
+        })()}
 
-        {branches.map(branch => {
+        {branches.filter(branch => {
+          const branchRecords = records.filter(r => r.branch_id === branch.id);
+          const completedSteps = new Set(branchRecords.filter(r => r.passed).map(r => r.step)).size;
+          return Math.round((completedSteps / CURRICULUM_STEPS.length) * 100) < 100;
+        }).map(branch => {
           const branchRecords = records.filter(r => r.branch_id === branch.id);
           const completedSteps = new Set(branchRecords.filter(r => r.passed).map(r => r.step)).size;
           const pct = Math.round((completedSteps / CURRICULUM_STEPS.length) * 100);
