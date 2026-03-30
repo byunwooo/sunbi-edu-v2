@@ -35,5 +35,6 @@ export type FinalComment = {
   branch_id: string;
   sv_comment: string;
   owner_comment: string;
+  ai_analysis: string;
   created_at: string;
 };

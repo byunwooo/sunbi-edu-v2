@@ -1,10 +1,14 @@
 import Anthropic from '@anthropic-ai/sdk';
 import { NextRequest, NextResponse } from 'next/server';
 
-const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
-
 export async function POST(req: NextRequest) {
   try {
+    const apiKey = process.env.ANTHROPIC_API_KEY;
+    if (!apiKey) {
+      return NextResponse.json({ error: 'API 키가 설정되지 않았습니다.' }, { status: 500 });
+    }
+
+    const client = new Anthropic({ apiKey });
     const { branches, records, curriculum } = await req.json();
 
     const prompt = `당신은 프랜차이즈 교육 분석 전문가입니다. 선비칼국수 프랜차이즈의 가맹점 교육 데이터를 분석해주세요.
@@ -14,7 +18,7 @@ ${curriculum.map((s: { id: number; label: string }) => `${s.id}. ${s.label}`).jo
 
 ## 지점별 교육 데이터
 ${branches.map((b: { name: string; owner_name: string }) => {
-  const branchRecords = records.filter((r: { branch_id: string; step: number; passed: boolean; score: number | null; sv_comment: string; owner_comment: string }) => r.branch_id === b.name);
+  const branchRecords = records.filter((r: { branch_id: string }) => r.branch_id === b.name);
   return `### ${b.name} (점주: ${b.owner_name})
 ${branchRecords.length > 0 ? branchRecords.map((r: { step: number; passed: boolean; score: number | null; sv_comment: string; owner_comment: string }) =>
   `- ${r.step}단계: ${r.passed ? '이수' : '미이수'} ${r.score ? `(${r.score}점)` : ''} ${r.sv_comment ? `SV: ${r.sv_comment}` : ''} ${r.owner_comment ? `점주: ${r.owner_comment}` : ''}`
@@ -42,8 +46,9 @@ ${branchRecords.length > 0 ? branchRecords.map((r: { step: number; passed: boole
     const text = content.type === 'text' ? content.text : '';
 
     return NextResponse.json({ analysis: text });
-  } catch (error) {
-    console.error('AI 분석 오류:', error);
-    return NextResponse.json({ error: 'AI 분석에 실패했습니다.' }, { status: 500 });
+  } catch (error: unknown) {
+    const errMsg = error instanceof Error ? error.message : 'Unknown error';
+    console.error('AI 분석 오류:', errMsg);
+    return NextResponse.json({ error: `AI 분석 실패: ${errMsg}` }, { status: 500 });
   }
 }

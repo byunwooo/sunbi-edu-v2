@@ -20,6 +20,9 @@ export default function BranchDetailPage() {
   const [editingFinal, setEditingFinal] = useState(false);
   const [savingRecord, setSavingRecord] = useState(false);
   const [savingFinal, setSavingFinal] = useState(false);
+  const [aiAnalysis, setAiAnalysis] = useState("");
+  const [aiLoading, setAiLoading] = useState(false);
+  const [aiError, setAiError] = useState("");
 
   useEffect(() => {
     async function fetchData() {
@@ -52,11 +55,67 @@ export default function BranchDetailPage() {
         setFinalComment(finalData);
         setFinalSv(finalData.sv_comment || "");
         setFinalOwner(finalData.owner_comment || "");
+        setAiAnalysis(finalData.ai_analysis || "");
       }
+
+      // 교육 완료 시 AI 분석 자동 실행 (아직 분석이 없을 때만)
+      const completedCount = new Set((recordData || []).filter((r: Record) => r.passed).map((r: Record) => r.step)).size;
+      if (completedCount >= CURRICULUM_STEPS.length && branchData && (!finalData || !finalData.ai_analysis)) {
+        runAiAnalysis(branchData, recordData || []);
+      }
+
       setLoading(false);
     }
     fetchData();
   }, [id]);
+
+  const runAiAnalysis = async (branchInfo: Branch, recordList: Record[]) => {
+    setAiLoading(true);
+    setAiError("");
+    try {
+      const enrichedRecords = recordList.map(r => ({
+        ...r,
+        branch_id: branchInfo.name,
+      }));
+
+      const res = await fetch("/api/analyze", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          branches: [branchInfo],
+          records: enrichedRecords,
+          curriculum: CURRICULUM_STEPS,
+        }),
+      });
+
+      const data = await res.json();
+
+      if (!res.ok) {
+        if (data.error?.includes("credit")) {
+          setAiError("AI 크레딧이 부족합니다. 관리자에게 문의하세요.");
+        } else {
+          setAiError("AI 분석에 실패했습니다. 잠시 후 다시 시도해주세요.");
+        }
+        return;
+      }
+
+      setAiAnalysis(data.analysis);
+
+      // DB에 AI 분석 결과 저장
+      await supabase
+        .from('final_comments')
+        .upsert({
+          branch_id: branchInfo.id,
+          sv_comment: finalSv,
+          owner_comment: finalOwner,
+          ai_analysis: data.analysis,
+        }, { onConflict: 'branch_id' });
+    } catch {
+      setAiError("AI 분석 요청에 실패했습니다.");
+    } finally {
+      setAiLoading(false);
+    }
+  };
 
   if (loading) {
     return (
@@ -118,7 +177,7 @@ export default function BranchDetailPage() {
       return;
     }
 
-    setFinalComment({ id: finalComment?.id || '', branch_id: branch.id, sv_comment: finalSv, owner_comment: finalOwner, created_at: finalComment?.created_at || new Date().toISOString() });
+    setFinalComment({ id: finalComment?.id || '', branch_id: branch.id, sv_comment: finalSv, owner_comment: finalOwner, ai_analysis: aiAnalysis, created_at: finalComment?.created_at || new Date().toISOString() });
     setEditingFinal(false);
     setSavingFinal(false);
   };
@@ -278,6 +337,35 @@ export default function BranchDetailPage() {
             </p>
           )}
         </div>
+
+        {/* AI 분석 결과 */}
+        {pct >= 100 && (
+          <>
+            <h3 className="text-[15px] font-bold mt-6 mb-3">AI 교육 분석</h3>
+            <div className="bg-white rounded-xl border p-5" style={{ borderColor: "var(--border-light)" }}>
+              {aiLoading && (
+                <div className="text-center py-6">
+                  <p className="text-sm font-semibold" style={{ color: "var(--primary)" }}>AI가 교육 데이터를 분석하고 있습니다...</p>
+                  <p className="text-xs mt-1" style={{ color: "var(--text-muted)" }}>약 10초 소요</p>
+                </div>
+              )}
+              {aiError && (
+                <div className="p-3 rounded-lg mb-3" style={{ background: "var(--warning-bg)" }}>
+                  <p className="text-sm" style={{ color: "var(--warning)" }}>{aiError}</p>
+                  <button className="text-xs font-semibold mt-2 hover:opacity-70 cursor-pointer" style={{ color: "var(--primary)" }} onClick={() => branch && runAiAnalysis(branch, records)}>
+                    다시 시도
+                  </button>
+                </div>
+              )}
+              {aiAnalysis && !aiLoading && (
+                <div className="text-sm leading-relaxed" style={{ color: "var(--text-secondary)" }} dangerouslySetInnerHTML={{ __html: aiAnalysis.replace(/\n/g, '<br/>').replace(/##\s*(.*?)(<br\/>)/g, '<h4 style="font-size:14px;font-weight:700;color:#1a1a1a;margin-top:16px;margin-bottom:8px">$1</h4>').replace(/\*\*(.*?)\*\*/g, '<strong style="color:#1a1a1a">$1</strong>').replace(/- (.*?)(<br\/>)/g, '<div style="padding-left:12px;margin-bottom:4px">- $1</div>') }} />
+              )}
+              {!aiAnalysis && !aiLoading && !aiError && (
+                <p className="text-sm text-center py-4" style={{ color: "var(--text-muted)" }}>AI 분석 결과가 없습니다.</p>
+              )}
+            </div>
+          </>
+        )}
       </main>
     </div>
   );
