@@ -3,25 +3,38 @@
 @tailwind utilities;
 
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  --primary: #8b1a1a;
+  --primary-dark: #5c1010;
+  --primary-light: #a82828;
+  --bg: #f7f2ec;
+  --bg-warm: #f0e8de;
+  --surface: #ffffff;
+  --text: #1a1a1a;
+  --text-secondary: #4a4a4a;
+  --text-muted: #8a8a8a;
+  --border: #e0d8d0;
+  --border-light: #ede6dd;
+  --success: #1a7a3a;
+  --success-bg: #e8f5e9;
+  --danger: #c62828;
+  --danger-bg: #fde8e8;
+  --warning: #e65100;
+  --warning-bg: #fff3e0;
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
-}
+* { box-sizing: border-box; }
 
 body {
-  color: var(--foreground);
-  background: var(--background);
-  font-family: Arial, Helvetica, sans-serif;
+  margin: 0;
+  background: var(--bg);
+  color: var(--text);
+  font-family: 'Pretendard', -apple-system, BlinkMacSystemFont, 'Malgun Gothic', sans-serif;
+  -webkit-font-smoothing: antialiased;
 }
 
-@layer utilities {
-  .text-balance {
-    text-wrap: balance;
-  }
+input, textarea, select, button { font-family: inherit; }
+
+input:focus, textarea:focus, select:focus {
+  outline: none;
+  border-color: var(--primary) !important;
 }
