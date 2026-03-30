@@ -18,7 +18,7 @@ export default function BranchesPage() {
   const [search, setSearch] = useState("");
   const [modal, setModal] = useState(false);
   const [editing, setEditing] = useState<Branch | null>(null);
-  const [form, setForm] = useState({ name: "", owner_name: "", phone: "", start_date: "" });
+  const [form, setForm] = useState({ name: "", owner_name: "", phones: [""], start_date: "" });
   const [branchType, setBranchType] = useState<"new" | "existing">("new");
   const [existingComments, setExistingComments] = useState<{ [step: number]: string }>({});
   const [saving, setSaving] = useState(false);
@@ -35,24 +35,25 @@ export default function BranchesPage() {
 
   const filtered = branches.filter(b => b.name.includes(search) || b.owner_name.includes(search));
 
-  const openAdd = () => { setEditing(null); setForm({ name: "", owner_name: "", phone: "", start_date: new Date().toISOString().slice(0,10) }); setBranchType("new"); setExistingComments({}); setModal(true); };
-  const openEdit = (b: Branch) => { setEditing(b); setForm({ name: b.name, owner_name: b.owner_name, phone: b.phone, start_date: b.start_date }); setModal(true); };
+  const openAdd = () => { setEditing(null); setForm({ name: "", owner_name: "", phones: [""], start_date: new Date().toISOString().slice(0,10) }); setBranchType("new"); setExistingComments({}); setModal(true); };
+  const openEdit = (b: Branch) => { setEditing(b); setForm({ name: b.name, owner_name: b.owner_name, phones: b.phone ? b.phone.split(", ") : [""], start_date: b.start_date }); setModal(true); };
 
   const handleSave = async () => {
     if (!form.name || !form.owner_name) { alert("지점명과 점주 이름은 필수입니다."); return; }
+    const phoneStr = form.phones.filter(p => p.trim()).join(", ");
     setSaving(true);
     try {
       if (editing) {
         const { error } = await supabase
           .from('branches')
-          .update({ name: form.name, owner_name: form.owner_name, phone: form.phone, start_date: form.start_date })
+          .update({ name: form.name, owner_name: form.owner_name, phone: phoneStr, start_date: form.start_date })
           .eq('id', editing.id);
         if (error) { alert('수정에 실패했습니다.'); console.error(error); setSaving(false); return; }
       } else {
         const lastStep = branchType === "existing" ? 8 : 0;
         const { data: newBranch, error } = await supabase
           .from('branches')
-          .insert({ name: form.name, owner_name: form.owner_name, phone: form.phone, start_date: form.start_date, last_step: lastStep })
+          .insert({ name: form.name, owner_name: form.owner_name, phone: phoneStr, start_date: form.start_date, last_step: lastStep })
           .select()
           .single();
         if (error || !newBranch) { alert('등록에 실패했습니다.'); console.error(error); setSaving(false); return; }
@@ -172,7 +173,15 @@ export default function BranchesPage() {
             <input className="w-full rounded-xl px-4 py-3 text-[15px] border" style={{ borderColor: "var(--border)", background: "var(--bg-warm)" }} placeholder="점주 이름을 입력하세요" value={form.owner_name} onChange={e => setForm(f => ({...f, owner_name: e.target.value}))} />
 
             <label className="block text-xs font-bold mb-1 mt-4" style={{ color: "var(--text-secondary)" }}>핸드폰 번호</label>
-            <input className="w-full rounded-xl px-4 py-3 text-[15px] border" style={{ borderColor: "var(--border)", background: "var(--bg-warm)" }} placeholder="010-0000-0000" value={form.phone} onChange={e => setForm(f => ({...f, phone: formatPhone(e.target.value)}))} maxLength={13} />
+            {form.phones.map((phone, idx) => (
+              <div key={idx} className="flex gap-2 mb-2">
+                <input className="flex-1 rounded-xl px-4 py-3 text-[15px] border" style={{ borderColor: "var(--border)", background: "var(--bg-warm)" }} placeholder="010-0000-0000" value={phone} onChange={e => { const newPhones = [...form.phones]; newPhones[idx] = formatPhone(e.target.value); setForm(f => ({...f, phones: newPhones})); }} maxLength={13} />
+                {form.phones.length > 1 && (
+                  <button className="px-3 rounded-xl text-sm font-bold border-2 hover:opacity-80 cursor-pointer" style={{ borderColor: "var(--danger)", color: "var(--danger)" }} onClick={() => setForm(f => ({...f, phones: f.phones.filter((_, i) => i !== idx)}))}>-</button>
+                )}
+              </div>
+            ))}
+            <button className="text-xs font-semibold hover:opacity-70 cursor-pointer mt-1" style={{ color: "var(--primary)" }} onClick={() => setForm(f => ({...f, phones: [...f.phones, ""]}))}>+ 연락처 추가</button>
 
             <label className="block text-xs font-bold mb-1 mt-4" style={{ color: "var(--text-secondary)" }}>교육 시작일</label>
             <input
