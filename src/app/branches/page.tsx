@@ -2,7 +2,7 @@
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase";
-import { type Branch } from "@/lib/constants";
+import { CURRICULUM_STEPS, type Branch } from "@/lib/constants";
 
 function formatPhone(v: string) {
   const nums = v.replace(/[^0-9]/g, "").slice(0, 11);
@@ -19,6 +19,8 @@ export default function BranchesPage() {
   const [modal, setModal] = useState(false);
   const [editing, setEditing] = useState<Branch | null>(null);
   const [form, setForm] = useState({ name: "", owner_name: "", phone: "", start_date: "" });
+  const [branchType, setBranchType] = useState<"new" | "existing">("new");
+  const [existingComments, setExistingComments] = useState<{ [step: number]: string }>({});
   const [saving, setSaving] = useState(false);
 
   const fetchBranches = async () => {
@@ -33,7 +35,7 @@ export default function BranchesPage() {
 
   const filtered = branches.filter(b => b.name.includes(search) || b.owner_name.includes(search));
 
-  const openAdd = () => { setEditing(null); setForm({ name: "", owner_name: "", phone: "", start_date: new Date().toISOString().slice(0,10) }); setModal(true); };
+  const openAdd = () => { setEditing(null); setForm({ name: "", owner_name: "", phone: "", start_date: new Date().toISOString().slice(0,10) }); setBranchType("new"); setExistingComments({}); setModal(true); };
   const openEdit = (b: Branch) => { setEditing(b); setForm({ name: b.name, owner_name: b.owner_name, phone: b.phone, start_date: b.start_date }); setModal(true); };
 
   const handleSave = async () => {
@@ -47,10 +49,27 @@ export default function BranchesPage() {
           .eq('id', editing.id);
         if (error) { alert('수정에 실패했습니다.'); console.error(error); setSaving(false); return; }
       } else {
-        const { error } = await supabase
+        const lastStep = branchType === "existing" ? 8 : 0;
+        const { data: newBranch, error } = await supabase
           .from('branches')
-          .insert({ name: form.name, owner_name: form.owner_name, phone: form.phone, start_date: form.start_date, last_step: 0 });
-        if (error) { alert('등록에 실패했습니다.'); console.error(error); setSaving(false); return; }
+          .insert({ name: form.name, owner_name: form.owner_name, phone: form.phone, start_date: form.start_date, last_step: lastStep })
+          .select()
+          .single();
+        if (error || !newBranch) { alert('등록에 실패했습니다.'); console.error(error); setSaving(false); return; }
+
+        // 기존 오픈 지점: 8단계 전부 이수 완료 + 코멘트 저장
+        if (branchType === "existing") {
+          const records = Array.from({ length: 8 }, (_, i) => ({
+            branch_id: newBranch.id,
+            step: i + 1,
+            passed: true,
+            score: null,
+            sv_comment: existingComments[i + 1] || "",
+            owner_comment: "",
+          }));
+          const { error: recError } = await supabase.from('records').insert(records);
+          if (recError) { console.error('기록 저장 실패:', recError); }
+        }
       }
       setModal(false);
       await fetchBranches();
@@ -118,7 +137,33 @@ export default function BranchesPage() {
       {modal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-5" style={{ background: "rgba(0,0,0,0.5)" }}>
           <div className="bg-white rounded-2xl p-6 w-full max-w-md max-h-[90vh] overflow-auto">
-            <h2 className="text-lg font-extrabold mb-5">{editing ? "지점 수정" : "신규 지점 등록"}</h2>
+            <h2 className="text-lg font-extrabold mb-5">{editing ? "지점 수정" : "지점 등록"}</h2>
+
+            {/* 신규/기존 선택 (등록 시에만) */}
+            {!editing && (
+              <div className="mb-5">
+                <label className="block text-xs font-bold mb-2" style={{ color: "var(--text-secondary)" }}>등록 유형</label>
+                <div className="grid grid-cols-2 gap-2">
+                  <button
+                    className={`py-3 rounded-xl text-sm font-semibold border-2 transition-all cursor-pointer ${branchType === "new" ? "text-white border-transparent" : "border-gray-200 hover:border-gray-300"}`}
+                    style={branchType === "new" ? { background: "var(--primary)" } : { color: "var(--text-muted)" }}
+                    onClick={() => setBranchType("new")}
+                  >
+                    신규 교육
+                  </button>
+                  <button
+                    className={`py-3 rounded-xl text-sm font-semibold border-2 transition-all cursor-pointer ${branchType === "existing" ? "text-white border-transparent" : "border-gray-200 hover:border-gray-300"}`}
+                    style={branchType === "existing" ? { background: "var(--success)" } : { color: "var(--text-muted)" }}
+                    onClick={() => setBranchType("existing")}
+                  >
+                    기존 오픈 지점
+                  </button>
+                </div>
+                {branchType === "existing" && (
+                  <p className="text-xs mt-2" style={{ color: "var(--text-muted)" }}>이미 교육이 완료된 지점입니다. 8단계 전체 이수 완료로 등록됩니다.</p>
+                )}
+              </div>
+            )}
 
             <label className="block text-xs font-bold mb-1 mt-4" style={{ color: "var(--text-secondary)" }}>지점명 <span style={{ color: "var(--danger)" }}>*</span></label>
             <input className="w-full rounded-xl px-4 py-3 text-[15px] border" style={{ borderColor: "var(--border)", background: "var(--bg-warm)" }} placeholder="지점명을 입력하세요" value={form.name} onChange={e => setForm(f => ({...f, name: e.target.value}))} />
@@ -140,6 +185,25 @@ export default function BranchesPage() {
               min="2024-01-01"
               max="2036-12-31"
             />
+
+            {/* 기존 오픈 지점: 단계별 코멘트 입력 */}
+            {!editing && branchType === "existing" && (
+              <div className="mt-5">
+                <label className="block text-xs font-bold mb-2" style={{ color: "var(--text-secondary)" }}>단계별 코멘트 (선택)</label>
+                {CURRICULUM_STEPS.map(step => (
+                  <div key={step.id} className="mb-2">
+                    <label className="block text-[11px] mb-1" style={{ color: "var(--text-muted)" }}>{step.id}단계 - {step.short}</label>
+                    <input
+                      className="w-full rounded-lg px-3 py-2 text-xs border"
+                      style={{ borderColor: "var(--border)", background: "var(--bg-warm)" }}
+                      placeholder="코멘트 (선택사항)"
+                      value={existingComments[step.id] || ""}
+                      onChange={e => setExistingComments(prev => ({ ...prev, [step.id]: e.target.value }))}
+                    />
+                  </div>
+                ))}
+              </div>
+            )}
 
             <div className="grid grid-cols-2 gap-3 mt-6">
               <button className="py-3.5 rounded-xl font-semibold border text-[15px] hover:opacity-80 transition-opacity cursor-pointer" style={{ borderColor: "var(--border)", color: "var(--text-muted)" }} onClick={() => setModal(false)}>취소</button>
