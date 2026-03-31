@@ -50,7 +50,21 @@ export default function RecordPage() {
     setStepId(id);
     setPassed(null);
     setScore(null);
-    setChecklistStatus({});
+
+    // 이전 기록의 체크리스트 불러오기 (못한 것만 추가 체크하면 됨)
+    if (branchId && id) {
+      const prevRecords = records
+        .filter(r => r.branch_id === branchId && r.step === parseInt(id))
+        .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+      const latestRecord = prevRecords[0];
+      if (latestRecord?.checklist_status) {
+        setChecklistStatus(latestRecord.checklist_status);
+      } else {
+        setChecklistStatus({});
+      }
+    } else {
+      setChecklistStatus({});
+    }
   };
 
   // 단계 이용 가능 여부 체크
