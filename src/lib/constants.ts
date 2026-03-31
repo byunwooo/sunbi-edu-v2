@@ -1,12 +1,15 @@
 export const CURRICULUM_STEPS = [
   { id: 1, label: '1단계 - 브랜드 & 메뉴 이해', short: '브랜드·메뉴' },
-  { id: 2, label: '2단계 - 주방 공간 적응 & 동선', short: '주방 동선' },
-  { id: 3, label: '3단계 - 주방기물 세팅', short: '기물 세팅' },
-  { id: 4, label: '4단계 - 조리 실습', short: '조리 실습' },
-  { id: 5, label: '5단계 - 음식 세팅', short: '음식 세팅' },
-  { id: 6, label: '6단계 - 홀 & 고객 응대', short: '홀·응대' },
-  { id: 7, label: '7단계 - 포스 & 정산', short: '포스·정산' },
-  { id: 8, label: '8단계 - 최종 테스트', short: '최종 테스트' },
+  { id: 2, label: '2단계 - 위생 및 안전', short: '위생·안전' },
+  { id: 3, label: '3단계 - 주방 공간 적응 & 동선', short: '주방 동선' },
+  { id: 4, label: '4단계 - 주방기물 세팅', short: '기물 세팅' },
+  { id: 5, label: '5단계 - 식자재 전처리 및 보관', short: '전처리·보관' },
+  { id: 6, label: '6단계 - 조리 실습', short: '조리 실습' },
+  { id: 7, label: '7단계 - 음식 세팅', short: '음식 세팅' },
+  { id: 8, label: '8단계 - 홀 & 고객 응대', short: '홀·응대' },
+  { id: 9, label: '9단계 - 포스 & 정산', short: '포스·정산' },
+  { id: 10, label: '10단계 - 오픈/마감 및 발주 관리', short: '오픈·마감·발주' },
+  { id: 11, label: '11단계 - 최종 테스트', short: '최종 테스트' },
 ];
 
 export type Branch = {
@@ -27,6 +30,7 @@ export type Record = {
   score: number | null;
   owner_comment: string;
   sv_comment: string;
+  started_at: string;
   created_at: string;
 };
 

@@ -234,6 +234,12 @@ export default function BranchDetailPage() {
                     <p className="text-sm font-semibold">{step.short}</p>
                     <p className="text-xs" style={{ color: "var(--text-muted)" }}>
                       {passed ? "이수 완료" : stepRecords.length > 0 ? "미이수" : "미진행"}
+                      {latestRecord?.started_at && passed && (() => {
+                        const start = new Date(latestRecord.started_at);
+                        const end = new Date(latestRecord.created_at);
+                        const days = Math.max(1, Math.ceil((end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24)) + 1);
+                        return <span style={{ color: "var(--primary)" }}> ({days}일 소요)</span>;
+                      })()}
                     </p>
                   </div>
                 </div>

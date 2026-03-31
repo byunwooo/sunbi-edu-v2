@@ -17,6 +17,7 @@ export default function RecordPage() {
   const [score, setScore] = useState<number | null>(null);
   const [ownerComment, setOwnerComment] = useState("");
   const [svComment, setSvComment] = useState("");
+  const [startedAt, setStartedAt] = useState("");
 
   useEffect(() => {
     async function fetchBranches() {
@@ -46,7 +47,7 @@ export default function RecordPage() {
   };
 
   const handleSave = async () => {
-    if (!branchId || !stepId || passed === null) { alert("필수 항목을 모두 입력해주세요."); return; }
+    if (!branchId || !stepId || passed === null || !startedAt) { alert("필수 항목을 모두 입력해주세요."); return; }
     if (passed && score === null) { alert("점수를 선택해주세요."); return; }
 
     setSaving(true);
@@ -59,6 +60,7 @@ export default function RecordPage() {
         score: passed ? score : null,
         owner_comment: ownerComment,
         sv_comment: svComment,
+        started_at: startedAt || new Date().toISOString().slice(0, 10),
       });
 
       if (insertError) {
@@ -140,6 +142,21 @@ export default function RecordPage() {
             </select>
             <ChevronDown size={16} className="absolute right-4 top-1/2 -translate-y-1/2 pointer-events-none" style={{ color: "var(--text-muted)" }} />
           </div>
+        </div>
+
+        {/* 교육 시작일 */}
+        <div className="mb-5">
+          <label className="block text-xs font-bold mb-1.5" style={{ color: "var(--text-secondary)" }}>교육 시작일 <span style={{ color: "var(--danger)" }}>*</span></label>
+          <input
+            type="date"
+            className="w-full rounded-xl px-4 py-3.5 text-[15px] border cursor-pointer"
+            style={{ borderColor: startedAt ? "var(--primary)" : "var(--border)", background: startedAt ? "rgba(139,26,26,0.05)" : "white" }}
+            value={startedAt}
+            onChange={e => setStartedAt(e.target.value)}
+            onClick={e => (e.target as HTMLInputElement).showPicker?.()}
+            max={new Date().toISOString().slice(0, 10)}
+          />
+          <p className="text-xs mt-1.5" style={{ color: "var(--text-muted)" }}>해당 단계 교육을 시작한 날짜를 선택하세요</p>
         </div>
 
         {/* 이수 여부 */}

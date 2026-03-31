@@ -52,7 +52,7 @@ export default function BranchesPage() {
           .eq('id', editing.id);
         if (error) { alert('수정에 실패했습니다.'); console.error(error); setSaving(false); return; }
       } else {
-        const lastStep = branchType === "existing" ? 8 : 0;
+        const lastStep = branchType === "existing" ? 11 : 0;
         const { data: newBranch, error } = await supabase
           .from('branches')
           .insert({ name: form.name, owner_name: form.owner_name, phone: phoneStr, start_date: form.start_date, last_step: lastStep })
@@ -62,7 +62,7 @@ export default function BranchesPage() {
 
         // 기존 오픈 지점: 8단계 전부 이수 완료 + 코멘트 저장
         if (branchType === "existing") {
-          const records = Array.from({ length: 8 }, (_, i) => ({
+          const records = Array.from({ length: 11 }, (_, i) => ({
             branch_id: newBranch.id,
             step: i + 1,
             passed: true,
