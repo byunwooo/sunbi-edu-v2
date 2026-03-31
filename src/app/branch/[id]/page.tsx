@@ -3,10 +3,12 @@ import { useState, useEffect } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase";
 import { CURRICULUM_STEPS, type Branch, type Record, type FinalComment } from "@/lib/constants";
+import { useAuth, canEdit } from "@/lib/auth-context";
 
 export default function BranchDetailPage() {
   const { id } = useParams();
   const router = useRouter();
+  const { role } = useAuth();
   const [branch, setBranch] = useState<Branch | null>(null);
   const [records, setRecords] = useState<Record[]>([]);
   const [finalComment, setFinalComment] = useState<FinalComment | null>(null);
@@ -262,9 +264,11 @@ export default function BranchDetailPage() {
                   {!latestRecord.sv_comment && !latestRecord.owner_comment && (
                     <p className="text-xs" style={{ color: "var(--text-muted)" }}>코멘트 없음</p>
                   )}
-                  <button className="text-xs font-semibold mt-2 hover:opacity-70 cursor-pointer" style={{ color: "var(--primary)" }} onClick={() => startEdit(step.id, latestRecord)}>
-                    코멘트 수정
-                  </button>
+                  {canEdit(role) && (
+                    <button className="text-xs font-semibold mt-2 hover:opacity-70 cursor-pointer" style={{ color: "var(--primary)" }} onClick={() => startEdit(step.id, latestRecord)}>
+                      코멘트 수정
+                    </button>
+                  )}
                 </div>
               )}
 
@@ -326,9 +330,11 @@ export default function BranchDetailPage() {
                   <p className="text-xs font-bold mb-1" style={{ color: "var(--text-secondary)" }}>점주 소감</p>
                   <p className="text-sm leading-relaxed" style={{ color: "var(--text-secondary)" }}>{finalOwner || "아직 작성되지 않았습니다."}</p>
                 </div>
-                <button className="text-xs font-semibold hover:opacity-70 cursor-pointer" style={{ color: "var(--primary)" }} onClick={() => setEditingFinal(true)}>
-                  코멘트 {finalComment ? "수정" : "작성"}
-                </button>
+                {canEdit(role) && (
+                  <button className="text-xs font-semibold hover:opacity-70 cursor-pointer" style={{ color: "var(--primary)" }} onClick={() => setEditingFinal(true)}>
+                    코멘트 {finalComment ? "수정" : "작성"}
+                  </button>
+                )}
               </>
             )
           ) : (
@@ -352,9 +358,11 @@ export default function BranchDetailPage() {
               {aiError && (
                 <div className="p-3 rounded-lg mb-3" style={{ background: "var(--warning-bg)" }}>
                   <p className="text-sm" style={{ color: "var(--warning)" }}>{aiError}</p>
-                  <button className="text-xs font-semibold mt-2 hover:opacity-70 cursor-pointer" style={{ color: "var(--primary)" }} onClick={() => branch && runAiAnalysis(branch, records)}>
-                    다시 시도
-                  </button>
+                  {canEdit(role) && (
+                    <button className="text-xs font-semibold mt-2 hover:opacity-70 cursor-pointer" style={{ color: "var(--primary)" }} onClick={() => branch && runAiAnalysis(branch, records)}>
+                      다시 시도
+                    </button>
+                  )}
                 </div>
               )}
               {aiAnalysis && !aiLoading && (

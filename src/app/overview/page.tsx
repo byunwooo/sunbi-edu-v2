@@ -3,9 +3,11 @@ import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase";
 import { CURRICULUM_STEPS, type Branch, type Record } from "@/lib/constants";
+import { useAuth, canEdit } from "@/lib/auth-context";
 
 export default function OverviewPage() {
   const router = useRouter();
+  const { role } = useAuth();
   const [branches, setBranches] = useState<Branch[]>([]);
   const [records, setRecords] = useState<Record[]>([]);
   const [loading, setLoading] = useState(true);
@@ -136,14 +138,20 @@ export default function OverviewPage() {
         </div>
 
         {/* AI 전체 분석 */}
-        <button
-          className="w-full py-3.5 rounded-xl font-bold text-[15px] shadow-md hover:opacity-90 transition-opacity cursor-pointer mb-5"
-          style={{ background: aiLoading ? "var(--text-muted)" : "var(--primary)", color: "white" }}
-          onClick={runGlobalAnalysis}
-          disabled={aiLoading}
-        >
-          {aiLoading ? "AI 분석 중... (약 15초)" : aiAnalysis ? "AI 전체 분석 다시 실행" : "AI 전체 분석 실행"}
-        </button>
+        {canEdit(role) ? (
+          <button
+            className="w-full py-3.5 rounded-xl font-bold text-[15px] shadow-md hover:opacity-90 transition-opacity cursor-pointer mb-5"
+            style={{ background: aiLoading ? "var(--text-muted)" : "var(--primary)", color: "white" }}
+            onClick={runGlobalAnalysis}
+            disabled={aiLoading}
+          >
+            {aiLoading ? "AI 분석 중... (약 15초)" : aiAnalysis ? "AI 전체 분석 다시 실행" : "AI 전체 분석 실행"}
+          </button>
+        ) : (
+          <div className="w-full py-3.5 rounded-xl text-center text-sm mb-5" style={{ background: "var(--bg-warm)", color: "var(--text-muted)" }}>
+            AI 분석 실행은 본사 관리자만 가능합니다
+          </div>
+        )}
 
         {aiError && (
           <div className="p-3 rounded-xl mb-4 text-sm" style={{ background: "var(--warning-bg)", color: "var(--warning)" }}>{aiError}</div>

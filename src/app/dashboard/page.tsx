@@ -4,6 +4,7 @@ import { useRouter } from "next/navigation";
 import { useState, useEffect } from "react";
 import { supabase } from "@/lib/supabase";
 import { CURRICULUM_STEPS, type Branch, type Record } from "@/lib/constants";
+import { useAuth } from "@/lib/auth-context";
 
 function getToday() {
   const d = new Date();
@@ -13,6 +14,7 @@ function getToday() {
 
 export default function DashboardPage() {
   const router = useRouter();
+  const { user, role, signOut } = useAuth();
   const [branches, setBranches] = useState<Branch[]>([]);
   const [records, setRecords] = useState<Record[]>([]);
   const [loading, setLoading] = useState(true);
@@ -49,8 +51,14 @@ export default function DashboardPage() {
           <div>
             <p className="text-xs" style={{ color: "var(--text-muted)" }}>{getToday()}</p>
             <h1 className="text-xl font-extrabold mt-0.5">안녕하세요</h1>
+            <div className="flex items-center gap-2 mt-1">
+              <span className="text-xs px-2 py-0.5 rounded-full font-semibold" style={{ background: role === "hq" ? "rgba(139,26,26,0.1)" : "rgba(52,152,219,0.1)", color: role === "hq" ? "var(--primary)" : "#3498db" }}>
+                {role === "hq" ? "본사 관리자" : "SV"}
+              </span>
+              <span className="text-xs" style={{ color: "var(--text-muted)" }}>{user?.email}</span>
+            </div>
           </div>
-          <button onClick={() => router.push("/")} className="text-xs font-semibold px-3.5 py-2 rounded-lg border hover:opacity-70 transition-opacity" style={{ borderColor: "var(--border)", color: "var(--text-muted)" }}>
+          <button onClick={async () => { await signOut(); router.push("/"); }} className="text-xs font-semibold px-3.5 py-2 rounded-lg border hover:opacity-70 transition-opacity" style={{ borderColor: "var(--border)", color: "var(--text-muted)" }}>
             로그아웃
           </button>
         </div>

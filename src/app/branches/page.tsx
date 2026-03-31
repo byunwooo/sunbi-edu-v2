@@ -3,6 +3,7 @@ import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase";
 import { CURRICULUM_STEPS, type Branch } from "@/lib/constants";
+import { useAuth, canEdit } from "@/lib/auth-context";
 
 function formatPhone(v: string) {
   const nums = v.replace(/[^0-9]/g, "").slice(0, 11);
@@ -13,6 +14,7 @@ function formatPhone(v: string) {
 
 export default function BranchesPage() {
   const router = useRouter();
+  const { role } = useAuth();
   const [branches, setBranches] = useState<Branch[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
@@ -119,10 +121,12 @@ export default function BranchesPage() {
               <p className="text-sm mt-1" style={{ color: "var(--text-muted)" }}>{b.owner_name} · {b.phone || "연락처 없음"}</p>
               <span className="inline-block text-xs mt-2 px-2 py-0.5 rounded-md" style={{ background: "var(--bg-warm)", color: "var(--text-secondary)" }}>교육 시작일: {b.start_date}</span>
             </div>
-            <div className="flex flex-col justify-center gap-1.5">
-              <button className="text-xs font-bold px-3 py-1.5 rounded-lg border-2 hover:opacity-80 transition-opacity cursor-pointer" style={{ borderColor: "var(--primary)", color: "var(--primary)" }} onClick={() => openEdit(b)}>수정</button>
-              <button className="text-xs font-bold px-3 py-1.5 rounded-lg border-2 hover:opacity-80 transition-opacity cursor-pointer" style={{ borderColor: "var(--danger)", color: "var(--danger)" }} onClick={() => handleDelete(b.id)}>삭제</button>
-            </div>
+            {canEdit(role) && (
+              <div className="flex flex-col justify-center gap-1.5">
+                <button className="text-xs font-bold px-3 py-1.5 rounded-lg border-2 hover:opacity-80 transition-opacity cursor-pointer" style={{ borderColor: "var(--primary)", color: "var(--primary)" }} onClick={() => openEdit(b)}>수정</button>
+                <button className="text-xs font-bold px-3 py-1.5 rounded-lg border-2 hover:opacity-80 transition-opacity cursor-pointer" style={{ borderColor: "var(--danger)", color: "var(--danger)" }} onClick={() => handleDelete(b.id)}>삭제</button>
+              </div>
+            )}
           </div>
         ))}
 

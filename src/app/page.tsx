@@ -2,16 +2,33 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { Eye, EyeOff } from "lucide-react";
+import { supabase } from "@/lib/supabase";
 
 export default function LoginPage() {
   const router = useRouter();
-  const [userId, setUserId] = useState("");
+  const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [showPw, setShowPw] = useState(false);
   const [error, setError] = useState("");
+  const [loading, setLoading] = useState(false);
 
-  const handleLogin = () => {
-    if (!userId || !password) { setError("아이디와 비밀번호를 입력해주세요."); return; }
+  const handleLogin = async () => {
+    if (!email || !password) { setError("이메일과 비밀번호를 입력해주세요."); return; }
+
+    setLoading(true);
+    setError("");
+
+    const { error: authError } = await supabase.auth.signInWithPassword({
+      email,
+      password,
+    });
+
+    if (authError) {
+      setError("이메일 또는 비밀번호가 올바르지 않습니다.");
+      setLoading(false);
+      return;
+    }
+
     router.push("/dashboard");
   };
 
@@ -34,14 +51,15 @@ export default function LoginPage() {
 
           {error && <div className="text-sm mb-4 p-3 rounded-lg text-left" style={{ background: "var(--danger-bg)", color: "var(--danger)" }}>{error}</div>}
 
-          <label className="block text-xs font-bold mb-1.5 tracking-wide text-center" style={{ color: "var(--text-secondary)" }}>아이디</label>
+          <label className="block text-xs font-bold mb-1.5 tracking-wide text-center" style={{ color: "var(--text-secondary)" }}>이메일</label>
           <input
             className="w-full rounded-xl px-4 py-3.5 text-[15px] text-center mb-5 border transition-colors"
             style={{ background: "var(--bg-warm)", borderColor: "var(--border-light)" }}
-            placeholder="아이디를 입력하세요"
-            value={userId}
-            onChange={e => { setUserId(e.target.value); setError(""); }}
-            autoComplete="off"
+            type="email"
+            placeholder="이메일을 입력하세요"
+            value={email}
+            onChange={e => { setEmail(e.target.value); setError(""); }}
+            autoComplete="email"
           />
 
           <label className="block text-xs font-bold mb-1.5 tracking-wide text-center" style={{ color: "var(--text-secondary)" }}>비밀번호</label>
@@ -60,12 +78,17 @@ export default function LoginPage() {
             </button>
           </div>
 
-          <button className="w-full py-4 rounded-xl text-white font-bold text-base shadow-md hover:opacity-90 transition-opacity cursor-pointer" style={{ background: "var(--primary)" }} onClick={handleLogin}>
-            로그인
+          <button
+            className="w-full py-4 rounded-xl text-white font-bold text-base shadow-md hover:opacity-90 transition-opacity cursor-pointer"
+            style={{ background: loading ? "var(--text-muted)" : "var(--primary)" }}
+            onClick={handleLogin}
+            disabled={loading}
+          >
+            {loading ? "로그인 중..." : "로그인"}
           </button>
         </div>
 
-        <p className="text-center text-xs mt-6" style={{ color: "var(--text-muted)" }}>© 2026 (주)GGC 선비칼국수</p>
+        <p className="text-center text-xs mt-6" style={{ color: "var(--text-muted)" }}>&copy; 2026 (주)GGC 선비칼국수</p>
       </div>
     </div>
   );

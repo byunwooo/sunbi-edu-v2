@@ -3,9 +3,11 @@ import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase";
 import { CURRICULUM_STEPS, type Branch, type Record } from "@/lib/constants";
+import { useAuth, canEdit } from "@/lib/auth-context";
 
 export default function AnalysisPage() {
   const router = useRouter();
+  const { role } = useAuth();
   const [branches, setBranches] = useState<Branch[]>([]);
   const [records, setRecords] = useState<Record[]>([]);
   const [loading, setLoading] = useState(true);
@@ -132,14 +134,20 @@ export default function AnalysisPage() {
         </div>
 
         {/* AI 분석 버튼 */}
-        <button
-          className="w-full py-4 rounded-xl text-white font-bold text-base shadow-md hover:opacity-90 transition-opacity cursor-pointer mb-5"
-          style={{ background: analyzing ? "var(--text-muted)" : "var(--primary)" }}
-          onClick={handleAnalyze}
-          disabled={analyzing}
-        >
-          {analyzing ? "AI 분석 중... (약 10초 소요)" : "AI 교육 분석 시작"}
-        </button>
+        {canEdit(role) ? (
+          <button
+            className="w-full py-4 rounded-xl text-white font-bold text-base shadow-md hover:opacity-90 transition-opacity cursor-pointer mb-5"
+            style={{ background: analyzing ? "var(--text-muted)" : "var(--primary)" }}
+            onClick={handleAnalyze}
+            disabled={analyzing}
+          >
+            {analyzing ? "AI 분석 중... (약 10초 소요)" : "AI 교육 분석 시작"}
+          </button>
+        ) : (
+          <div className="w-full py-4 rounded-xl text-center text-sm mb-5" style={{ background: "var(--bg-warm)", color: "var(--text-muted)" }}>
+            AI 분석 실행은 본사 관리자만 가능합니다
+          </div>
+        )}
 
         {error && <div className="text-sm mb-4 p-3 rounded-lg" style={{ background: "var(--danger-bg)", color: "var(--danger)" }}>{error}</div>}
 
