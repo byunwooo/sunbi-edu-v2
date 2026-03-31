@@ -84,7 +84,8 @@ export default function RecordPage() {
       }
 
       // 1~10단계: 자유 접근
-      return { ...s, disabled: false, hint: isCompleted ? "이수 완료" : "진행 가능" };
+      const hasRecord = branchRecords.some(r => r.step === s.id);
+      return { ...s, disabled: false, hint: isCompleted ? "이수 완료" : hasRecord ? "진행 중" : "진행 가능" };
     });
   };
 
