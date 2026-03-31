@@ -84,67 +84,76 @@ export default function DashboardPage() {
 
         {/* 교육 현황 */}
         {(() => {
-          const inProgressBranches = branches.filter(branch => {
+          const branchList = branches.map(branch => {
             const branchRecords = records.filter(r => r.branch_id === branch.id);
             const completedSteps = new Set(branchRecords.filter(r => r.passed).map(r => r.step)).size;
-            return Math.round((completedSteps / CURRICULUM_STEPS.length) * 100) < 100;
+            const pct = Math.round((completedSteps / CURRICULUM_STEPS.length) * 100);
+            const status = pct >= 100 ? "complete" : pct > 0 ? "progress" : "notStarted";
+            return { ...branch, branchRecords, completedSteps, pct, status };
           });
+          const completeCount = branchList.filter(b => b.status === "complete").length;
+          const progressCount = branchList.filter(b => b.status === "progress").length;
+          const notStartedCount = branchList.filter(b => b.status === "notStarted").length;
+
           return (
             <>
               <div className="flex items-center justify-between mb-4">
-                <h2 className="text-[15px] font-bold">현재 교육 현황</h2>
-                <span className="text-xs font-semibold px-2 py-0.5 rounded-full" style={{ background: "rgba(139,26,26,0.1)", color: "var(--primary)" }}>{inProgressBranches.length}개 지점 진행 중</span>
+                <h2 className="text-[15px] font-bold">교육 현황</h2>
+                <div className="flex gap-2">
+                  {completeCount > 0 && <span className="text-xs font-semibold px-2 py-0.5 rounded-full" style={{ background: "rgba(26,122,58,0.1)", color: "var(--success)" }}>{completeCount} 완료</span>}
+                  {progressCount > 0 && <span className="text-xs font-semibold px-2 py-0.5 rounded-full" style={{ background: "rgba(230,126,34,0.1)", color: "#e67e22" }}>{progressCount} 진행 중</span>}
+                  {notStartedCount > 0 && <span className="text-xs font-semibold px-2 py-0.5 rounded-full" style={{ background: "rgba(149,165,166,0.1)", color: "#95a5a6" }}>{notStartedCount} 시작 전</span>}
+                </div>
               </div>
-              {inProgressBranches.length === 0 && (
+              {branchList.length === 0 && (
                 <div className="text-center py-10">
-                  <p className="text-sm" style={{ color: "var(--text-muted)" }}>진행 중인 교육이 없습니다</p>
+                  <p className="text-sm" style={{ color: "var(--text-muted)" }}>등록된 지점이 없습니다</p>
                 </div>
               )}
+              {branchList.map(branch => {
+                const statusColor = branch.status === "complete" ? "var(--success)" : branch.status === "progress" ? "#e67e22" : "#95a5a6";
+                const statusBorder = branch.status === "complete" ? "rgba(26,122,58,0.3)" : branch.status === "progress" ? "rgba(230,126,34,0.3)" : "var(--border-light)";
+                const statusLabel = branch.status === "complete" ? "완료" : branch.status === "progress" ? "진행 중" : "시작 전";
+                const statusBg = branch.status === "complete" ? "rgba(26,122,58,0.08)" : branch.status === "progress" ? "rgba(230,126,34,0.08)" : "rgba(149,165,166,0.08)";
+
+                return (
+                  <div key={branch.id} className="bg-white rounded-2xl p-5 mb-3 border shadow-sm cursor-pointer hover:shadow-md transition-shadow" style={{ borderColor: statusBorder, borderLeftWidth: 4, borderLeftColor: statusColor }} onClick={() => router.push(`/branch/${branch.id}`)}>
+                    <div className="flex justify-between mb-3">
+                      <div>
+                        <div className="flex items-center gap-2">
+                          <h3 className="text-[17px] font-bold">{branch.name}</h3>
+                          <span className="text-[11px] font-semibold px-2 py-0.5 rounded-full" style={{ background: statusBg, color: statusColor }}>{statusLabel}</span>
+                        </div>
+                        <p className="text-xs mt-1" style={{ color: "var(--text-muted)" }}>{branch.owner_name} · {branch.branchRecords.length}건 기록</p>
+                      </div>
+                      <div className="text-right">
+                        <span className="text-2xl font-extrabold" style={{ color: statusColor }}>{branch.pct}%</span>
+                        <p className="text-xs" style={{ color: "var(--text-muted)" }}>{branch.completedSteps}/{CURRICULUM_STEPS.length}단계</p>
+                      </div>
+                    </div>
+
+                    {/* 프로그레스 바 */}
+                    <div className="h-1 rounded-full mb-4" style={{ background: "var(--bg-warm)" }}>
+                      <div className="h-full rounded-full transition-all" style={{ width: `${branch.pct}%`, background: statusColor }} />
+                    </div>
+
+                    {/* 단계 칩 */}
+                    <div className="flex gap-1.5 flex-wrap">
+                      {CURRICULUM_STEPS.map(step => {
+                        const done = branch.branchRecords.some(r => r.step === step.id && r.passed);
+                        return (
+                          <div key={step.id} className="w-8 h-8 rounded-lg flex items-center justify-center text-xs font-bold" style={{ background: done ? "var(--success-bg)" : "var(--bg-warm)", color: done ? "var(--success)" : "var(--text-muted)", opacity: done ? 1 : 0.4 }}>
+                            {step.id}
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                );
+              })}
             </>
           );
         })()}
-
-        {branches.filter(branch => {
-          const branchRecords = records.filter(r => r.branch_id === branch.id);
-          const completedSteps = new Set(branchRecords.filter(r => r.passed).map(r => r.step)).size;
-          return Math.round((completedSteps / CURRICULUM_STEPS.length) * 100) < 100;
-        }).map(branch => {
-          const branchRecords = records.filter(r => r.branch_id === branch.id);
-          const completedSteps = new Set(branchRecords.filter(r => r.passed).map(r => r.step)).size;
-          const pct = Math.round((completedSteps / CURRICULUM_STEPS.length) * 100);
-
-          return (
-            <div key={branch.id} className="bg-white rounded-2xl p-5 mb-3 border shadow-sm cursor-pointer hover:shadow-md transition-shadow" style={{ borderColor: "var(--border-light)" }} onClick={() => router.push(`/branch/${branch.id}`)}>
-              <div className="flex justify-between mb-3">
-                <div>
-                  <h3 className="text-[17px] font-bold">{branch.name}</h3>
-                  <p className="text-xs mt-1" style={{ color: "var(--text-muted)" }}>{branch.owner_name} · {branchRecords.length}건 기록</p>
-                </div>
-                <div className="text-right">
-                  <span className="text-2xl font-extrabold" style={{ color: pct >= 100 ? "var(--success)" : "var(--primary)" }}>{pct}%</span>
-                  <p className="text-xs" style={{ color: "var(--text-muted)" }}>{completedSteps}/{CURRICULUM_STEPS.length}단계</p>
-                </div>
-              </div>
-
-              {/* 프로그레스 바 */}
-              <div className="h-1 rounded-full mb-4" style={{ background: "var(--bg-warm)" }}>
-                <div className="h-full rounded-full transition-all" style={{ width: `${pct}%`, background: pct >= 100 ? "var(--success)" : "var(--primary)" }} />
-              </div>
-
-              {/* 단계 칩 */}
-              <div className="flex gap-1.5 flex-wrap">
-                {CURRICULUM_STEPS.map(step => {
-                  const done = branchRecords.some(r => r.step === step.id && r.passed);
-                  return (
-                    <div key={step.id} className="w-8 h-8 rounded-lg flex items-center justify-center text-xs font-bold" style={{ background: done ? "var(--success-bg)" : "var(--bg-warm)", color: done ? "var(--success)" : "var(--text-muted)", opacity: done ? 1 : 0.4 }}>
-                      {step.id}
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
-          );
-        })}
       </main>
     </div>
   );

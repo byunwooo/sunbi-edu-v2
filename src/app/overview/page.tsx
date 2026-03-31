@@ -184,20 +184,25 @@ export default function OverviewPage() {
 
         <p className="text-xs mb-3" style={{ color: "var(--text-muted)" }}>{filtered.length}개 지점</p>
 
-        {filtered.map(b => (
-          <div key={b.id} className={`bg-white rounded-2xl p-5 mb-3 border shadow-sm cursor-pointer hover:shadow-md transition-shadow ${b.isComplete ? "border-green-400" : ""}`} style={{ borderColor: b.isComplete ? undefined : "var(--border-light)" }} onClick={() => router.push(`/branch/${b.id}`)}>
+        {filtered.map(b => {
+          const statusColor = b.isComplete ? "var(--success)" : b.pct > 0 ? "#e67e22" : "#95a5a6";
+          const statusLabel = b.isComplete ? "완료" : b.pct > 0 ? "진행 중" : "시작 전";
+          const statusBg = b.isComplete ? "rgba(26,122,58,0.08)" : b.pct > 0 ? "rgba(230,126,34,0.08)" : "rgba(149,165,166,0.08)";
+          const statusBorder = b.isComplete ? "rgba(26,122,58,0.3)" : b.pct > 0 ? "rgba(230,126,34,0.3)" : "var(--border-light)";
+          return (
+          <div key={b.id} className="bg-white rounded-2xl p-5 mb-3 border shadow-sm cursor-pointer hover:shadow-md transition-shadow" style={{ borderColor: statusBorder, borderLeftWidth: 4, borderLeftColor: statusColor }} onClick={() => router.push(`/branch/${b.id}`)}>
             <div className="flex justify-between items-start mb-3">
               <div>
                 <div className="flex items-center gap-2">
                   <h3 className="text-base font-bold">{b.name}</h3>
-                  {b.isComplete && <span className="text-xs font-semibold px-2 py-0.5 rounded-full" style={{ background: "var(--success-bg)", color: "var(--success)" }}>완료</span>}
+                  <span className="text-[11px] font-semibold px-2 py-0.5 rounded-full" style={{ background: statusBg, color: statusColor }}>{statusLabel}</span>
                 </div>
                 <p className="text-xs mt-1" style={{ color: "var(--text-muted)" }}>{b.owner_name} / 기록 {b.totalRecords}건 / 평균 {b.avgScore}점</p>
               </div>
-              <span className="text-2xl font-extrabold" style={{ color: b.isComplete ? "var(--success)" : "var(--primary)" }}>{b.pct}%</span>
+              <span className="text-2xl font-extrabold" style={{ color: statusColor }}>{b.pct}%</span>
             </div>
             <div className="h-1 rounded-full mb-3" style={{ background: "var(--bg-warm)" }}>
-              <div className="h-full rounded-full" style={{ width: `${b.pct}%`, background: b.isComplete ? "var(--success)" : "var(--primary)" }} />
+              <div className="h-full rounded-full" style={{ width: `${b.pct}%`, background: statusColor }} />
             </div>
             <div className="flex flex-wrap gap-1.5">
               {CURRICULUM_STEPS.map(step => {
@@ -210,7 +215,8 @@ export default function OverviewPage() {
               })}
             </div>
           </div>
-        ))}
+          );
+        })}
 
         {filtered.length === 0 && (
           <div className="text-center py-16">

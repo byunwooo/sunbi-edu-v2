@@ -114,10 +114,17 @@ export default function BranchesPage() {
 
         <p className="text-xs mb-3" style={{ color: "var(--text-muted)" }}>전체 <strong style={{ color: "var(--text)" }}>{filtered.length}개</strong> 지점</p>
 
-        {filtered.map(b => (
-          <div key={b.id} className="bg-white rounded-2xl p-5 mb-3 border shadow-sm flex justify-between" style={{ borderColor: "var(--border-light)" }}>
+        {filtered.map(b => {
+          const statusColor = b.last_step >= CURRICULUM_STEPS.length ? "var(--success)" : b.last_step > 0 ? "#e67e22" : "#95a5a6";
+          const statusLabel = b.last_step >= CURRICULUM_STEPS.length ? "완료" : b.last_step > 0 ? "진행 중" : "시작 전";
+          const statusBg = b.last_step >= CURRICULUM_STEPS.length ? "rgba(26,122,58,0.08)" : b.last_step > 0 ? "rgba(230,126,34,0.08)" : "rgba(149,165,166,0.08)";
+          return (
+          <div key={b.id} className="bg-white rounded-2xl p-5 mb-3 border shadow-sm flex justify-between" style={{ borderColor: "var(--border-light)", borderLeftWidth: 4, borderLeftColor: statusColor }}>
             <div>
-              <h3 className="text-base font-bold">{b.name}</h3>
+              <div className="flex items-center gap-2">
+                <h3 className="text-base font-bold">{b.name}</h3>
+                <span className="text-[11px] font-semibold px-2 py-0.5 rounded-full" style={{ background: statusBg, color: statusColor }}>{statusLabel}</span>
+              </div>
               <p className="text-sm mt-1" style={{ color: "var(--text-muted)" }}>{b.owner_name} · {b.phone || "연락처 없음"}</p>
               <span className="inline-block text-xs mt-2 px-2 py-0.5 rounded-md" style={{ background: "var(--bg-warm)", color: "var(--text-secondary)" }}>교육 시작일: {b.start_date}</span>
             </div>
@@ -128,7 +135,8 @@ export default function BranchesPage() {
               </div>
             )}
           </div>
-        ))}
+          );
+        })}
 
         {filtered.length === 0 && (
           <div className="text-center py-16">
