@@ -3,11 +3,12 @@ import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { ChevronDown } from "lucide-react";
 import { supabase } from "@/lib/supabase";
-import { CURRICULUM_STEPS, type Branch } from "@/lib/constants";
+import { CURRICULUM_STEPS, type Branch, type Record as RecordType } from "@/lib/constants";
 
 export default function RecordPage() {
   const router = useRouter();
   const [branches, setBranches] = useState<Branch[]>([]);
+  const [records, setRecords] = useState<RecordType[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [branchId, setBranchId] = useState("");
@@ -18,19 +19,22 @@ export default function RecordPage() {
   const [ownerComment, setOwnerComment] = useState("");
   const [svComment, setSvComment] = useState("");
   const [startedAt, setStartedAt] = useState("");
+  const [checklistStatus, setChecklistStatus] = useState<{ [key: string]: boolean }>({});
 
   useEffect(() => {
-    async function fetchBranches() {
+    async function fetchData() {
       setLoading(true);
-      const { data, error } = await supabase.from('branches').select('*');
-      if (error) { alert('지점 데이터를 불러오는데 실패했습니다.'); console.error(error); }
-      setBranches(data || []);
+      const { data: branchData } = await supabase.from('branches').select('*');
+      const { data: recordData } = await supabase.from('records').select('*');
+      setBranches(branchData || []);
+      setRecords(recordData || []);
       setLoading(false);
     }
-    fetchBranches();
+    fetchData();
   }, []);
 
   const selectedBranch = branches.find(b => b.id === branchId);
+  const selectedStep = CURRICULUM_STEPS.find(s => s.id === parseInt(stepId));
 
   const handleBranchChange = (id: string) => {
     setBranchId(id);
@@ -39,20 +43,52 @@ export default function RecordPage() {
     setStepId("");
     setPassed(null);
     setScore(null);
+    setChecklistStatus({});
   };
 
+  const handleStepChange = (id: string) => {
+    setStepId(id);
+    setPassed(null);
+    setScore(null);
+    setChecklistStatus({});
+  };
+
+  // 단계 이용 가능 여부 체크
   const getAvailableSteps = () => {
-    const lastStep = selectedBranch?.last_step || 0;
-    return CURRICULUM_STEPS.map(s => ({ ...s, disabled: s.id > lastStep + 1, hint: s.id <= lastStep ? "이수 완료" : s.id === lastStep + 1 ? "현재 단계" : "이전 단계 이수 필요" }));
+    if (!branchId) return CURRICULUM_STEPS.map(s => ({ ...s, disabled: true, hint: "지점 선택 필요" }));
+
+    const branchRecords = records.filter(r => r.branch_id === branchId);
+    const completedSteps = new Set(branchRecords.filter(r => r.passed).map(r => r.step));
+
+    return CURRICULUM_STEPS.map(s => {
+      const isCompleted = completedSteps.has(s.id);
+
+      // 11단계: 1~10 전부 완료해야 접근 가능
+      if (s.id === 11) {
+        const allDone = Array.from({ length: 10 }, (_, i) => i + 1).every(id => completedSteps.has(id));
+        return { ...s, disabled: !allDone, hint: isCompleted ? "이수 완료" : allDone ? "응시 가능" : "1~10단계 완료 필요" };
+      }
+
+      // 1~10단계: 자유 접근
+      return { ...s, disabled: false, hint: isCompleted ? "이수 완료" : "진행 가능" };
+    });
+  };
+
+  // 필수 체크리스트 충족 여부
+  const requiredItemsMet = () => {
+    if (!selectedStep) return false;
+    return selectedStep.checklist
+      .filter(item => item.required)
+      .every(item => checklistStatus[item.id]);
   };
 
   const handleSave = async () => {
     if (!branchId || !stepId || passed === null || !startedAt) { alert("필수 항목을 모두 입력해주세요."); return; }
     if (passed && score === null) { alert("점수를 선택해주세요."); return; }
+    if (passed && !requiredItemsMet()) { alert("필수 체크항목(★)을 모두 통과시켜야 이수 완료할 수 있습니다."); return; }
 
     setSaving(true);
     try {
-      // 기록 저장
       const { error: insertError } = await supabase.from('records').insert({
         branch_id: branchId,
         step: parseInt(stepId),
@@ -60,7 +96,8 @@ export default function RecordPage() {
         score: passed ? score : null,
         owner_comment: ownerComment,
         sv_comment: svComment,
-        started_at: startedAt || new Date().toISOString().slice(0, 10),
+        started_at: startedAt,
+        checklist_status: checklistStatus,
       });
 
       if (insertError) {
@@ -75,14 +112,10 @@ export default function RecordPage() {
         const currentStep = parseInt(stepId);
         const currentLastStep = selectedBranch?.last_step || 0;
         if (currentStep > currentLastStep) {
-          const { error: updateError } = await supabase
+          await supabase
             .from('branches')
             .update({ last_step: currentStep })
             .eq('id', branchId);
-
-          if (updateError) {
-            console.error('last_step 업데이트 실패:', updateError);
-          }
         }
       }
 
@@ -136,13 +169,49 @@ export default function RecordPage() {
         <div className="mb-5">
           <label className="block text-xs font-bold mb-1.5" style={{ color: "var(--text-secondary)" }}>커리큘럼 단계 <span style={{ color: "var(--danger)" }}>*</span></label>
           <div className="relative">
-            <select className="w-full appearance-none rounded-xl px-4 py-3.5 text-[15px] border cursor-pointer" style={{ background: stepId ? "rgba(139,26,26,0.05)" : "white", borderColor: stepId ? "var(--primary)" : "var(--border)", opacity: !branchId ? 0.5 : 1 }} value={stepId} onChange={e => { setStepId(e.target.value); setPassed(null); setScore(null); }} disabled={!branchId}>
+            <select className="w-full appearance-none rounded-xl px-4 py-3.5 text-[15px] border cursor-pointer" style={{ background: stepId ? "rgba(139,26,26,0.05)" : "white", borderColor: stepId ? "var(--primary)" : "var(--border)", opacity: !branchId ? 0.5 : 1 }} value={stepId} onChange={e => handleStepChange(e.target.value)} disabled={!branchId}>
               <option value="">단계 선택</option>
               {getAvailableSteps().map(s => <option key={s.id} value={s.id} disabled={s.disabled}>{s.label} ({s.hint})</option>)}
             </select>
             <ChevronDown size={16} className="absolute right-4 top-1/2 -translate-y-1/2 pointer-events-none" style={{ color: "var(--text-muted)" }} />
           </div>
+          {branchId && (
+            <p className="text-xs mt-1.5" style={{ color: "var(--text-muted)" }}>1~10단계 자유 진행 / 11단계는 전체 이수 후 응시</p>
+          )}
         </div>
+
+        {/* 체크리스트 */}
+        {selectedStep && (
+          <div className="mb-5">
+            <label className="block text-xs font-bold mb-2" style={{ color: "var(--text-secondary)" }}>
+              세부 체크리스트 <span className="font-normal" style={{ color: "var(--text-muted)" }}>(★ 필수 항목)</span>
+            </label>
+            <div className="bg-white rounded-xl border p-4" style={{ borderColor: "var(--border-light)" }}>
+              {selectedStep.checklist.map(item => (
+                <label key={item.id} className="flex items-start gap-3 py-2.5 cursor-pointer" style={{ borderBottom: "1px solid var(--border-light)" }}>
+                  <input
+                    type="checkbox"
+                    checked={checklistStatus[item.id] || false}
+                    onChange={e => setChecklistStatus(prev => ({ ...prev, [item.id]: e.target.checked }))}
+                    className="mt-0.5 w-5 h-5 rounded cursor-pointer accent-[#8b1a1a]"
+                  />
+                  <span className="text-sm flex-1" style={{ color: checklistStatus[item.id] ? "var(--text)" : "var(--text-secondary)" }}>
+                    {item.required && <span className="text-red-500 font-bold mr-1">★</span>}
+                    {item.label}
+                  </span>
+                  {checklistStatus[item.id] && (
+                    <span className="text-xs font-semibold px-2 py-0.5 rounded-full" style={{ background: "var(--success-bg)", color: "var(--success)" }}>완료</span>
+                  )}
+                </label>
+              ))}
+            </div>
+            {selectedStep.checklist.some(i => i.required) && !requiredItemsMet() && (
+              <p className="text-xs mt-2" style={{ color: "var(--danger)" }}>
+                ★ 필수 항목을 모두 체크해야 이수 완료할 수 있습니다
+              </p>
+            )}
+          </div>
+        )}
 
         {/* 교육 시작일 */}
         <div className="mb-5">
@@ -190,7 +259,7 @@ export default function RecordPage() {
         {/* 미이수 경고 */}
         {passed === false && (
           <div className="mb-5 p-4 rounded-xl text-sm leading-relaxed" style={{ background: "var(--warning-bg)", color: "var(--warning)" }}>
-            미이수 처리 시 다음 단계로 넘어갈 수 없습니다. 해당 단계를 재교육 후 이수 완료로 변경해주세요.
+            미이수 처리 시 해당 단계를 재교육 후 이수 완료로 변경해주세요.
           </div>
         )}
 

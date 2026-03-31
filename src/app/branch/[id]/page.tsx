@@ -258,6 +258,26 @@ export default function BranchDetailPage() {
                 )}
               </div>
 
+              {/* 체크리스트 현황 */}
+              {latestRecord && latestRecord.checklist_status && (
+                <div className="mt-3 pt-3 border-t" style={{ borderColor: "var(--border-light)" }}>
+                  <div className="flex flex-wrap gap-1.5">
+                    {step.checklist.map(item => {
+                      const checked = latestRecord.checklist_status[item.id];
+                      return (
+                        <span key={item.id} className="inline-flex items-center gap-1 text-[11px] px-2 py-1 rounded-lg" style={{
+                          background: checked ? "var(--success-bg)" : "var(--bg-warm)",
+                          color: checked ? "var(--success)" : "var(--text-muted)",
+                          fontWeight: item.required ? 700 : 400,
+                        }}>
+                          {checked ? "✓" : "○"} {item.required && "★"}{item.label}
+                        </span>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+
               {/* 코멘트 - 읽기 모드 */}
               {latestRecord && !isEditing && (
                 <div className="mt-3 pt-3 border-t" style={{ borderColor: "var(--border-light)" }}>
