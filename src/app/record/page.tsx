@@ -232,13 +232,22 @@ export default function RecordPage() {
         <div className="mb-5">
           <label className="block text-xs font-bold mb-1.5" style={{ color: "var(--text-secondary)" }}>이수 여부 <span style={{ color: "var(--danger)" }}>*</span></label>
           <div className="grid grid-cols-2 gap-3">
-            <button className={`py-4 rounded-xl font-semibold text-[15px] border-2 transition-all cursor-pointer ${passed === true ? "border-green-600 bg-green-50 text-green-700" : "border-gray-200 text-gray-400 hover:border-gray-300"}`} onClick={() => { setPassed(true); setScore(null); }}>
+            <button
+              className={`py-4 rounded-xl font-semibold text-[15px] border-2 transition-all ${!selectedStep || requiredItemsMet() ? "cursor-pointer" : "cursor-not-allowed opacity-50"} ${passed === true ? "border-green-600 bg-green-50 text-green-700" : "border-gray-200 text-gray-400 hover:border-gray-300"}`}
+              onClick={() => { if (selectedStep && requiredItemsMet()) { setPassed(true); setScore(null); } }}
+              disabled={!!selectedStep && !requiredItemsMet()}
+            >
               O  이수 완료
             </button>
             <button className={`py-4 rounded-xl font-semibold text-[15px] border-2 transition-all cursor-pointer ${passed === false ? "border-red-600 bg-red-50 text-red-700" : "border-gray-200 text-gray-400 hover:border-gray-300"}`} onClick={() => { setPassed(false); setScore(null); }}>
               X  미이수
             </button>
           </div>
+          {selectedStep && !requiredItemsMet() && (
+            <p className="text-xs mt-2" style={{ color: "var(--warning)" }}>
+              ★ 필수 항목 통과 전에는 미이수로만 저장할 수 있습니다
+            </p>
+          )}
         </div>
 
         {/* 점수 (이수 시) */}
