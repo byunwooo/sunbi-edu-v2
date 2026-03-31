@@ -60,7 +60,7 @@ export default function BranchesPage() {
           .single();
         if (error || !newBranch) { alert('등록에 실패했습니다.'); console.error(error); setSaving(false); return; }
 
-        // 기존 오픈 지점: 8단계 전부 이수 완료 + 코멘트 저장
+        // 기존 오픈 지점: 11단계 전부 이수 완료 + 코멘트 저장
         if (branchType === "existing") {
           const records = Array.from({ length: 11 }, (_, i) => ({
             branch_id: newBranch.id,
