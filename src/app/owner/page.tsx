@@ -170,15 +170,17 @@ export default function OwnerPage() {
           const failedRecord = records.find(r => r.step === step.id && !r.passed);
           const isCompleted = !!stepRecord;
           const isFailed = !isCompleted && !!failedRecord;
+          const latestRequest = requests.filter(r => r.step === step.id).sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())[0];
+          const isRejected = !isCompleted && latestRequest?.status === "rejected";
           const isExpanded = expandedStep === step.id;
           const checklistStatus = stepRecord?.checklist_status || failedRecord?.checklist_status || {};
 
-          const statusColor = isCompleted ? "var(--success)" : isFailed ? "#e67e22" : "#95a5a6";
-          const statusBg = isCompleted ? "rgba(26,122,58,0.08)" : isFailed ? "rgba(230,126,34,0.08)" : "rgba(149,165,166,0.05)";
-          const statusLabel = isCompleted ? "이수" : isFailed ? "진행 중" : "미시작";
+          const statusColor = isCompleted ? "var(--success)" : isRejected ? "var(--danger)" : isFailed ? "#e67e22" : "#95a5a6";
+          const statusBg = isCompleted ? "rgba(26,122,58,0.08)" : isRejected ? "rgba(231,76,60,0.08)" : isFailed ? "rgba(230,126,34,0.08)" : "rgba(149,165,166,0.05)";
+          const statusLabel = isCompleted ? "이수" : isRejected ? "반려" : isFailed ? "진행 중" : "미시작";
 
           return (
-            <div key={step.id} className="bg-white rounded-2xl mb-3 border shadow-sm overflow-hidden" style={{ borderColor: isCompleted ? "rgba(26,122,58,0.3)" : "var(--border-light)", borderLeftWidth: 4, borderLeftColor: statusColor }}>
+            <div key={step.id} className="bg-white rounded-2xl mb-3 border shadow-sm overflow-hidden" style={{ borderColor: isCompleted ? "rgba(26,122,58,0.3)" : isRejected ? "rgba(231,76,60,0.3)" : "var(--border-light)", borderLeftWidth: 4, borderLeftColor: statusColor }}>
               <button
                 className="w-full px-5 py-4 flex items-center justify-between text-left"
                 onClick={() => setExpandedStep(isExpanded ? null : step.id)}
@@ -349,11 +351,11 @@ export default function OwnerPage() {
                 {CURRICULUM_STEPS.find(s => s.id === requestModal)?.label}
               </p>
 
-              <label className="block text-xs font-bold mb-1" style={{ color: "var(--text-secondary)" }}>메시지 (선택)</label>
+              <label className="block text-xs font-bold mb-1" style={{ color: "var(--text-secondary)" }}>교육 코멘트 (선택)</label>
               <textarea
                 className="w-full rounded-xl px-4 py-3 text-[14px] border mb-5 resize-none"
                 style={{ borderColor: "var(--border)", background: "var(--bg-warm)" }}
-                placeholder="SV에게 전달할 메시지를 입력하세요"
+                placeholder="이 단계 교육에 대한 소감이나 느낀점을 남겨주세요"
                 rows={3}
                 value={requestMsg}
                 onChange={e => setRequestMsg(e.target.value)}

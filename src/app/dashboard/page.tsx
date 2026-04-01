@@ -243,7 +243,7 @@ export default function DashboardPage() {
 
             {reviewModal.owner_message && (
               <div className="text-xs p-3 rounded-lg mb-4" style={{ background: "var(--bg-warm)" }}>
-                <span className="font-semibold">점주 메시지:</span> {reviewModal.owner_message}
+                <span className="font-semibold">교육 코멘트:</span> {reviewModal.owner_message}
               </div>
             )}
 
