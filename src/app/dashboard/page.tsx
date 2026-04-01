@@ -3,7 +3,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState, useEffect } from "react";
 import { supabase } from "@/lib/supabase";
-import { CURRICULUM_STEPS, type Branch, type Record } from "@/lib/constants";
+import { CURRICULUM_STEPS, type Branch, type Record, type CompletionRequest } from "@/lib/constants";
 import { useAuth } from "@/lib/auth-context";
 
 function getToday() {
@@ -17,7 +17,11 @@ export default function DashboardPage() {
   const { user, role, signOut } = useAuth();
   const [branches, setBranches] = useState<Branch[]>([]);
   const [records, setRecords] = useState<Record[]>([]);
+  const [requests, setRequests] = useState<CompletionRequest[]>([]);
   const [loading, setLoading] = useState(true);
+  const [reviewModal, setReviewModal] = useState<CompletionRequest | null>(null);
+  const [reviewComment, setReviewComment] = useState("");
+  const [reviewSaving, setReviewSaving] = useState(false);
 
   useEffect(() => {
     async function fetchData() {
@@ -28,12 +32,35 @@ export default function DashboardPage() {
       const { data: recordData, error: recordError } = await supabase.from('records').select('*');
       if (recordError) { alert('기록 데이터를 불러오는데 실패했습니다.'); console.error(recordError); }
 
+      const { data: requestData } = await supabase.from('completion_requests').select('*').eq('status', 'pending');
+
       setBranches(branchData || []);
       setRecords(recordData || []);
+      setRequests(requestData || []);
       setLoading(false);
     }
     fetchData();
   }, []);
+
+  const handleReview = async (status: 'approved' | 'rejected') => {
+    if (!reviewModal || !user) return;
+    setReviewSaving(true);
+    const { error } = await supabase.from('completion_requests').update({
+      status,
+      reviewer_id: user.id,
+      reviewer_comment: reviewComment,
+      reviewed_at: new Date().toISOString(),
+    }).eq('id', reviewModal.id);
+    if (error) {
+      alert('처리에 실패했습니다.');
+      console.error(error);
+    } else {
+      setRequests(prev => prev.filter(r => r.id !== reviewModal.id));
+      setReviewModal(null);
+      setReviewComment("");
+    }
+    setReviewSaving(false);
+  };
 
   if (loading) {
     return (
@@ -81,6 +108,37 @@ export default function DashboardPage() {
             <p className="text-xs mt-1" style={{ color: "var(--text-muted)" }}>진행률 & 분석</p>
           </Link>
         </div>
+
+        {/* 이수 요청 알림 */}
+        {requests.length > 0 && (
+          <div className="mb-6">
+            <h2 className="text-[15px] font-bold mb-3 flex items-center gap-2">
+              이수 요청
+              <span className="text-xs font-semibold px-2 py-0.5 rounded-full text-white" style={{ background: "#e74c3c" }}>{requests.length}</span>
+            </h2>
+            {requests.map(req => {
+              const reqBranch = branches.find(b => b.id === req.branch_id);
+              const stepInfo = CURRICULUM_STEPS.find(s => s.id === req.step);
+              return (
+                <div key={req.id} className="bg-white rounded-2xl p-4 mb-2 border shadow-sm cursor-pointer hover:shadow-md transition-shadow" style={{ borderColor: "rgba(52,152,219,0.3)", borderLeftWidth: 4, borderLeftColor: "#3498db" }} onClick={() => { setReviewModal(req); setReviewComment(""); }}>
+                  <div className="flex justify-between items-center">
+                    <div>
+                      <p className="text-[14px] font-bold">{reqBranch?.name || "알 수 없는 지점"}</p>
+                      <p className="text-xs mt-0.5" style={{ color: "var(--text-muted)" }}>{stepInfo?.label} · {reqBranch?.owner_name}</p>
+                    </div>
+                    <div className="text-right">
+                      <span className="text-[11px] font-semibold px-2 py-1 rounded-full" style={{ background: "rgba(52,152,219,0.1)", color: "#3498db" }}>대기 중</span>
+                      <p className="text-[10px] mt-1" style={{ color: "var(--text-muted)" }}>{new Date(req.created_at).toLocaleDateString("ko-KR")}</p>
+                    </div>
+                  </div>
+                  {req.owner_message && (
+                    <p className="text-xs mt-2 p-2 rounded-lg" style={{ background: "var(--bg-warm)", color: "var(--text-secondary)" }}>&ldquo;{req.owner_message}&rdquo;</p>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        )}
 
         {/* 교육 현황 */}
         {(() => {
@@ -155,6 +213,43 @@ export default function DashboardPage() {
           );
         })()}
       </main>
+
+      {/* 이수 요청 승인/반려 모달 */}
+      {reviewModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-5" style={{ background: "rgba(0,0,0,0.5)" }}>
+          <div className="bg-white rounded-2xl p-6 w-full max-w-md">
+            <h2 className="text-lg font-extrabold mb-1">이수 요청 검토</h2>
+            <p className="text-sm mb-1" style={{ color: "var(--text-muted)" }}>
+              {branches.find(b => b.id === reviewModal.branch_id)?.name} · {branches.find(b => b.id === reviewModal.branch_id)?.owner_name}
+            </p>
+            <p className="text-sm font-semibold mb-4" style={{ color: "var(--primary)" }}>
+              {CURRICULUM_STEPS.find(s => s.id === reviewModal.step)?.label}
+            </p>
+
+            {reviewModal.owner_message && (
+              <div className="text-xs p-3 rounded-lg mb-4" style={{ background: "var(--bg-warm)" }}>
+                <span className="font-semibold">점주 메시지:</span> {reviewModal.owner_message}
+              </div>
+            )}
+
+            <label className="block text-xs font-bold mb-1" style={{ color: "var(--text-secondary)" }}>코멘트 (선택)</label>
+            <textarea
+              className="w-full rounded-xl px-4 py-3 text-[14px] border mb-5 resize-none"
+              style={{ borderColor: "var(--border)", background: "var(--bg-warm)" }}
+              placeholder="승인 또는 반려 사유를 입력하세요"
+              rows={3}
+              value={reviewComment}
+              onChange={e => setReviewComment(e.target.value)}
+            />
+
+            <div className="grid grid-cols-3 gap-2">
+              <button className="py-3 rounded-xl font-semibold border text-[14px] hover:opacity-80 transition-opacity cursor-pointer" style={{ borderColor: "var(--border)", color: "var(--text-muted)" }} onClick={() => setReviewModal(null)}>닫기</button>
+              <button className="py-3 rounded-xl font-bold text-white text-[14px] shadow-sm hover:opacity-90 transition-opacity cursor-pointer" style={{ background: "var(--danger)" }} onClick={() => handleReview('rejected')} disabled={reviewSaving}>반려</button>
+              <button className="py-3 rounded-xl font-bold text-white text-[14px] shadow-sm hover:opacity-90 transition-opacity cursor-pointer" style={{ background: "var(--success)" }} onClick={() => handleReview('approved')} disabled={reviewSaving}>승인</button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

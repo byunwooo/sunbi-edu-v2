@@ -163,6 +163,19 @@ export type Record = {
   created_at: string;
 };
 
+export type CompletionRequest = {
+  id: string;
+  branch_id: string;
+  step: number;
+  owner_id: string;
+  status: 'pending' | 'approved' | 'rejected';
+  owner_message: string;
+  reviewer_id: string | null;
+  reviewer_comment: string;
+  created_at: string;
+  reviewed_at: string | null;
+};
+
 export type FinalComment = {
   id: string;
   branch_id: string;
