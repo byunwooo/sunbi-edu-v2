@@ -32,32 +32,35 @@ export async function middleware(request: NextRequest) {
   const isAdminRoute = !isLoginPage && !isOwnerRoute;
   const role = user?.app_metadata?.role || user?.user_metadata?.role || null;
 
+  // 리다이렉트 시 세션 쿠키를 유지하는 헬퍼
+  const redirectTo = (pathname: string) => {
+    const url = request.nextUrl.clone();
+    url.pathname = pathname;
+    const redirectResponse = NextResponse.redirect(url);
+    supabaseResponse.cookies.getAll().forEach(cookie => {
+      redirectResponse.cookies.set(cookie.name, cookie.value);
+    });
+    return redirectResponse;
+  };
+
   // 비인증 사용자 → 로그인 페이지로
   if (!user && !isLoginPage) {
-    const url = request.nextUrl.clone();
-    url.pathname = '/';
-    return NextResponse.redirect(url);
+    return redirectTo('/');
   }
 
   // 인증 사용자가 로그인 페이지 접근 → 역할별 리다이렉트
   if (user && isLoginPage) {
-    const url = request.nextUrl.clone();
-    url.pathname = role === 'owner' ? '/owner' : '/dashboard';
-    return NextResponse.redirect(url);
+    return redirectTo(role === 'owner' ? '/owner' : '/dashboard');
   }
 
   // owner가 관리자 페이지 접근 차단
   if (user && role === 'owner' && isAdminRoute) {
-    const url = request.nextUrl.clone();
-    url.pathname = '/owner';
-    return NextResponse.redirect(url);
+    return redirectTo('/owner');
   }
 
   // hq/sv가 owner 페이지 접근 차단
   if (user && role !== 'owner' && isOwnerRoute) {
-    const url = request.nextUrl.clone();
-    url.pathname = '/dashboard';
-    return NextResponse.redirect(url);
+    return redirectTo('/dashboard');
   }
 
   return supabaseResponse;

@@ -55,6 +55,21 @@ export default function DashboardPage() {
       alert('처리에 실패했습니다.');
       console.error(error);
     } else {
+      // 승인 시 교육 기록(records) 자동 생성
+      if (status === 'approved') {
+        const step = CURRICULUM_STEPS.find(s => s.id === reviewModal.step);
+        const checklistStatus: { [key: string]: boolean } = {};
+        step?.checklist.forEach(item => { checklistStatus[item.id] = true; });
+        await supabase.from('records').insert({
+          branch_id: reviewModal.branch_id,
+          step: reviewModal.step,
+          passed: true,
+          score: null,
+          sv_comment: reviewComment || '',
+          owner_comment: reviewModal.owner_message || '',
+          checklist_status: checklistStatus,
+        });
+      }
       setRequests(prev => prev.filter(r => r.id !== reviewModal.id));
       setReviewModal(null);
       setReviewComment("");
