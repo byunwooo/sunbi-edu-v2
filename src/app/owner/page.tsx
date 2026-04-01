@@ -4,7 +4,7 @@ import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase";
 import { CURRICULUM_STEPS, type Branch, type Record, type CompletionRequest } from "@/lib/constants";
 import { useAuth } from "@/lib/auth-context";
-import { CheckCircle2, Circle, Star, ChevronDown, ChevronUp, LogOut, BookOpen, Send, Clock, XCircle } from "lucide-react";
+import { CheckCircle2, Circle, Star, ChevronDown, ChevronUp, LogOut, BookOpen, Play, Clock, XCircle, MessageSquare } from "lucide-react";
 import { MANUAL_CONTENT } from "@/lib/manual-content";
 
 function getToday() {
@@ -95,19 +95,37 @@ export default function OwnerPage() {
   const submitRequest = async (step: number) => {
     if (!user || !branch) return;
     setRequestSaving(true);
-    const { data, error } = await supabase.from("completion_requests").insert({
-      branch_id: branch.id,
-      step,
-      owner_id: user.id,
-      owner_message: requestMsg,
-    }).select().single();
-    if (error) {
-      alert("이수 요청에 실패했습니다.");
-      console.error(error);
-    } else if (data) {
-      setRequests(prev => [...prev, data]);
-      setRequestModal(null);
-      setRequestMsg("");
+
+    // 이미 진행 중인 요청이 있으면 어려웠던 점 업데이트
+    const existingPending = requests.find(r => r.step === step && r.status === "pending");
+    if (existingPending) {
+      const { error } = await supabase.from("completion_requests")
+        .update({ owner_message: requestMsg })
+        .eq("id", existingPending.id);
+      if (error) {
+        alert("저장에 실패했습니다.");
+        console.error(error);
+      } else {
+        setRequests(prev => prev.map(r => r.id === existingPending.id ? { ...r, owner_message: requestMsg } : r));
+        setRequestModal(null);
+        setRequestMsg("");
+      }
+    } else {
+      // 새 교육 시작
+      const { data, error } = await supabase.from("completion_requests").insert({
+        branch_id: branch.id,
+        step,
+        owner_id: user.id,
+        owner_message: requestMsg,
+      }).select().single();
+      if (error) {
+        alert("교육 시작에 실패했습니다.");
+        console.error(error);
+      } else if (data) {
+        setRequests(prev => [...prev, data]);
+        setRequestModal(null);
+        setRequestMsg("");
+      }
     }
     setRequestSaving(false);
   };
@@ -261,28 +279,58 @@ export default function OwnerPage() {
                     })}
                   </div>
 
-                  {/* 이수 요청 */}
+                  {/* 교육 시작/진행 상태 */}
                   {!isCompleted && (() => {
-                    const stepRequest = requests.filter(r => r.step === step.id).sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())[0];
-                    if (stepRequest?.status === "pending") {
+                    const stepRequests = requests.filter(r => r.step === step.id).sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+                    const latestReq = stepRequests[0];
+
+                    // 교육 진행 중 (SV 평가 대기)
+                    if (latestReq?.status === "pending") {
                       return (
-                        <div className="mt-3 p-3 rounded-xl flex items-center gap-2" style={{ background: "rgba(52,152,219,0.08)", border: "1px solid rgba(52,152,219,0.2)" }}>
-                          <Clock size={14} style={{ color: "#3498db" }} />
-                          <span className="text-[12px] font-semibold" style={{ color: "#3498db" }}>이수 요청 대기 중</span>
-                          <span className="text-[11px] ml-auto" style={{ color: "var(--text-muted)" }}>{new Date(stepRequest.created_at).toLocaleDateString("ko-KR")}</span>
+                        <div className="mt-3">
+                          <div className="p-3 rounded-xl" style={{ background: "rgba(52,152,219,0.08)", border: "1px solid rgba(52,152,219,0.2)" }}>
+                            <div className="flex items-center gap-2 mb-2">
+                              <Clock size={14} style={{ color: "#3498db" }} />
+                              <span className="text-[12px] font-semibold" style={{ color: "#3498db" }}>교육 진행 중</span>
+                              <span className="text-[11px] ml-auto" style={{ color: "var(--text-muted)" }}>{new Date(latestReq.created_at).toLocaleDateString("ko-KR")} 시작</span>
+                            </div>
+                            {latestReq.owner_message && (
+                              <div className="text-[11px] p-2 rounded-lg mb-2" style={{ background: "rgba(52,152,219,0.05)" }}>
+                                <span className="font-semibold">내가 어려웠던 점:</span> {latestReq.owner_message}
+                              </div>
+                            )}
+                            {!latestReq.owner_message && (
+                              <button
+                                className="w-full py-2 rounded-lg text-[12px] font-semibold flex items-center justify-center gap-1.5 border hover:opacity-80 transition-opacity"
+                                style={{ borderColor: "rgba(52,152,219,0.3)", color: "#3498db" }}
+                                onClick={() => { setRequestModal(step.id); setRequestMsg(""); }}
+                              >
+                                <MessageSquare size={12} /> 어려웠던 점 작성하기
+                              </button>
+                            )}
+                          </div>
                         </div>
                       );
                     }
-                    if (stepRequest?.status === "rejected") {
+
+                    // 미이수 (재교육 필요)
+                    if (latestReq?.status === "rejected") {
                       return (
                         <div className="mt-3">
                           <div className="p-3 rounded-xl mb-2" style={{ background: "var(--danger-bg)", border: "1px solid rgba(231,76,60,0.2)" }}>
                             <div className="flex items-center gap-2 mb-1">
                               <XCircle size={14} style={{ color: "var(--danger)" }} />
-                              <span className="text-[12px] font-semibold" style={{ color: "var(--danger)" }}>이수 요청 반려됨</span>
+                              <span className="text-[12px] font-semibold" style={{ color: "var(--danger)" }}>미이수 — 재교육 필요</span>
                             </div>
-                            {stepRequest.reviewer_comment && (
-                              <p className="text-[11px] mt-1" style={{ color: "var(--text-secondary)" }}>사유: {stepRequest.reviewer_comment}</p>
+                            {latestReq.reviewer_comment && (
+                              <div className="text-[11px] mt-1 p-2 rounded-lg" style={{ background: "rgba(231,76,60,0.05)" }}>
+                                <span className="font-semibold">SV 피드백:</span> {latestReq.reviewer_comment}
+                              </div>
+                            )}
+                            {latestReq.owner_message && (
+                              <div className="text-[11px] mt-1 p-2 rounded-lg" style={{ background: "rgba(231,76,60,0.05)" }}>
+                                <span className="font-semibold">내가 어려웠던 점:</span> {latestReq.owner_message}
+                              </div>
                             )}
                           </div>
                           <button
@@ -290,18 +338,38 @@ export default function OwnerPage() {
                             style={{ borderColor: "#3498db", color: "#3498db" }}
                             onClick={() => { setRequestModal(step.id); setRequestMsg(""); }}
                           >
-                            <Send size={14} /> 다시 이수 요청
+                            <Play size={14} /> 재교육 시작
                           </button>
                         </div>
                       );
                     }
+
+                    // 이수 완료된 이전 기록 표시 (approved)
+                    if (latestReq?.status === "approved") {
+                      return (
+                        <div className="mt-3 p-3 rounded-xl" style={{ background: "var(--success-bg)", border: "1px solid rgba(26,122,58,0.2)" }}>
+                          {latestReq.reviewer_comment && (
+                            <div className="text-[11px] p-2 rounded-lg mb-1" style={{ background: "rgba(26,122,58,0.05)" }}>
+                              <span className="font-semibold">SV 피드백:</span> {latestReq.reviewer_comment}
+                            </div>
+                          )}
+                          {latestReq.owner_message && (
+                            <div className="text-[11px] p-2 rounded-lg" style={{ background: "rgba(26,122,58,0.05)" }}>
+                              <span className="font-semibold">내가 어려웠던 점:</span> {latestReq.owner_message}
+                            </div>
+                          )}
+                        </div>
+                      );
+                    }
+
+                    // 아직 시작 안 한 단계
                     return (
                       <button
-                        className="w-full mt-3 py-2.5 rounded-xl text-[13px] font-semibold flex items-center justify-center gap-2 border hover:opacity-80 transition-opacity"
-                        style={{ borderColor: "#3498db", color: "#3498db" }}
+                        className="w-full mt-3 py-2.5 rounded-xl text-[13px] font-semibold flex items-center justify-center gap-2 text-white shadow-sm hover:opacity-90 transition-opacity"
+                        style={{ background: "#3498db" }}
                         onClick={() => { setRequestModal(step.id); setRequestMsg(""); }}
                       >
-                        <Send size={14} /> 이수 요청
+                        <Play size={14} /> 교육 시작
                       </button>
                     );
                   })()}
@@ -342,20 +410,22 @@ export default function OwnerPage() {
           </div>
         )}
 
-        {/* 이수 요청 모달 */}
+        {/* 교육 시작 / 어려웠던 점 작성 모달 */}
         {requestModal && (
           <div className="fixed inset-0 z-50 flex items-center justify-center p-5" style={{ background: "rgba(0,0,0,0.5)" }}>
             <div className="bg-white rounded-2xl p-6 w-full max-w-md">
-              <h2 className="text-lg font-extrabold mb-1">이수 요청</h2>
+              <h2 className="text-lg font-extrabold mb-1">
+                {requests.some(r => r.step === requestModal && r.status === "pending") ? "어려웠던 점 작성" : "교육 시작"}
+              </h2>
               <p className="text-sm mb-5" style={{ color: "var(--text-muted)" }}>
                 {CURRICULUM_STEPS.find(s => s.id === requestModal)?.label}
               </p>
 
-              <label className="block text-xs font-bold mb-1" style={{ color: "var(--text-secondary)" }}>교육 코멘트 (선택)</label>
+              <label className="block text-xs font-bold mb-1" style={{ color: "var(--text-secondary)" }}>어려웠던 점 (선택)</label>
               <textarea
                 className="w-full rounded-xl px-4 py-3 text-[14px] border mb-5 resize-none"
                 style={{ borderColor: "var(--border)", background: "var(--bg-warm)" }}
-                placeholder="이 단계 교육에 대한 소감이나 느낀점을 남겨주세요"
+                placeholder="교육을 받으면서 어려웠던 점을 적어주세요"
                 rows={3}
                 value={requestMsg}
                 onChange={e => setRequestMsg(e.target.value)}
@@ -363,7 +433,7 @@ export default function OwnerPage() {
 
               <div className="grid grid-cols-2 gap-3">
                 <button className="py-3.5 rounded-xl font-semibold border text-[15px] hover:opacity-80 transition-opacity cursor-pointer" style={{ borderColor: "var(--border)", color: "var(--text-muted)" }} onClick={() => setRequestModal(null)}>취소</button>
-                <button className="py-3.5 rounded-xl font-bold text-white text-[15px] shadow-sm hover:opacity-90 transition-opacity cursor-pointer" style={{ background: "#3498db" }} onClick={() => submitRequest(requestModal)} disabled={requestSaving}>{requestSaving ? "요청 중..." : "요청 보내기"}</button>
+                <button className="py-3.5 rounded-xl font-bold text-white text-[15px] shadow-sm hover:opacity-90 transition-opacity cursor-pointer" style={{ background: "#3498db" }} onClick={() => submitRequest(requestModal)} disabled={requestSaving}>{requestSaving ? "저장 중..." : requests.some(r => r.step === requestModal && r.status === "pending") ? "저장" : "교육 시작"}</button>
               </div>
             </div>
           </div>

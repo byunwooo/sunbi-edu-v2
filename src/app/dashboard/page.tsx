@@ -124,12 +124,12 @@ export default function DashboardPage() {
           </Link>
         </div>
 
-        {/* 이수 요청 알림 */}
+        {/* 교육 진행 중 */}
         {requests.length > 0 && (
           <div className="mb-6">
             <h2 className="text-[15px] font-bold mb-3 flex items-center gap-2">
-              이수 요청
-              <span className="text-xs font-semibold px-2 py-0.5 rounded-full text-white" style={{ background: "#e74c3c" }}>{requests.length}</span>
+              교육 진행 중
+              <span className="text-xs font-semibold px-2 py-0.5 rounded-full text-white" style={{ background: "#3498db" }}>{requests.length}</span>
             </h2>
             {requests.map(req => {
               const reqBranch = branches.find(b => b.id === req.branch_id);
@@ -142,12 +142,14 @@ export default function DashboardPage() {
                       <p className="text-xs mt-0.5" style={{ color: "var(--text-muted)" }}>{stepInfo?.label} · {reqBranch?.owner_name}</p>
                     </div>
                     <div className="text-right">
-                      <span className="text-[11px] font-semibold px-2 py-1 rounded-full" style={{ background: "rgba(52,152,219,0.1)", color: "#3498db" }}>대기 중</span>
-                      <p className="text-[10px] mt-1" style={{ color: "var(--text-muted)" }}>{new Date(req.created_at).toLocaleDateString("ko-KR")}</p>
+                      <span className="text-[11px] font-semibold px-2 py-1 rounded-full" style={{ background: "rgba(52,152,219,0.1)", color: "#3498db" }}>평가 대기</span>
+                      <p className="text-[10px] mt-1" style={{ color: "var(--text-muted)" }}>{new Date(req.created_at).toLocaleDateString("ko-KR")} 시작</p>
                     </div>
                   </div>
                   {req.owner_message && (
-                    <p className="text-xs mt-2 p-2 rounded-lg" style={{ background: "var(--bg-warm)", color: "var(--text-secondary)" }}>&ldquo;{req.owner_message}&rdquo;</p>
+                    <div className="text-xs mt-2 p-2 rounded-lg" style={{ background: "var(--bg-warm)", color: "var(--text-secondary)" }}>
+                      <span className="font-semibold">점주 어려웠던 점:</span> {req.owner_message}
+                    </div>
                   )}
                 </div>
               );
@@ -229,11 +231,11 @@ export default function DashboardPage() {
         })()}
       </main>
 
-      {/* 이수 요청 승인/반려 모달 */}
+      {/* 교육 평가 모달 (이수/미이수) */}
       {reviewModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-5" style={{ background: "rgba(0,0,0,0.5)" }}>
           <div className="bg-white rounded-2xl p-6 w-full max-w-md">
-            <h2 className="text-lg font-extrabold mb-1">이수 요청 검토</h2>
+            <h2 className="text-lg font-extrabold mb-1">교육 평가</h2>
             <p className="text-sm mb-1" style={{ color: "var(--text-muted)" }}>
               {branches.find(b => b.id === reviewModal.branch_id)?.name} · {branches.find(b => b.id === reviewModal.branch_id)?.owner_name}
             </p>
@@ -242,16 +244,17 @@ export default function DashboardPage() {
             </p>
 
             {reviewModal.owner_message && (
-              <div className="text-xs p-3 rounded-lg mb-4" style={{ background: "var(--bg-warm)" }}>
-                <span className="font-semibold">교육 코멘트:</span> {reviewModal.owner_message}
+              <div className="text-xs p-3 rounded-lg mb-4" style={{ background: "rgba(52,152,219,0.06)", border: "1px solid rgba(52,152,219,0.15)" }}>
+                <span className="font-semibold" style={{ color: "#3498db" }}>점주가 어려웠던 점:</span>
+                <p className="mt-1" style={{ color: "var(--text-secondary)" }}>{reviewModal.owner_message}</p>
               </div>
             )}
 
-            <label className="block text-xs font-bold mb-1" style={{ color: "var(--text-secondary)" }}>코멘트 (선택)</label>
+            <label className="block text-xs font-bold mb-1" style={{ color: "var(--text-secondary)" }}>점주가 어려워했던 점 (선택)</label>
             <textarea
               className="w-full rounded-xl px-4 py-3 text-[14px] border mb-5 resize-none"
               style={{ borderColor: "var(--border)", background: "var(--bg-warm)" }}
-              placeholder="승인 또는 반려 사유를 입력하세요"
+              placeholder="교육하면서 점주가 어려워했던 부분을 적어주세요"
               rows={3}
               value={reviewComment}
               onChange={e => setReviewComment(e.target.value)}
@@ -259,8 +262,8 @@ export default function DashboardPage() {
 
             <div className="grid grid-cols-3 gap-2">
               <button className="py-3 rounded-xl font-semibold border text-[14px] hover:opacity-80 transition-opacity cursor-pointer" style={{ borderColor: "var(--border)", color: "var(--text-muted)" }} onClick={() => setReviewModal(null)}>닫기</button>
-              <button className="py-3 rounded-xl font-bold text-white text-[14px] shadow-sm hover:opacity-90 transition-opacity cursor-pointer" style={{ background: "var(--danger)" }} onClick={() => handleReview('rejected')} disabled={reviewSaving}>반려</button>
-              <button className="py-3 rounded-xl font-bold text-white text-[14px] shadow-sm hover:opacity-90 transition-opacity cursor-pointer" style={{ background: "var(--success)" }} onClick={() => handleReview('approved')} disabled={reviewSaving}>승인</button>
+              <button className="py-3 rounded-xl font-bold text-white text-[14px] shadow-sm hover:opacity-90 transition-opacity cursor-pointer" style={{ background: "var(--danger)" }} onClick={() => handleReview('rejected')} disabled={reviewSaving}>미이수</button>
+              <button className="py-3 rounded-xl font-bold text-white text-[14px] shadow-sm hover:opacity-90 transition-opacity cursor-pointer" style={{ background: "var(--success)" }} onClick={() => handleReview('approved')} disabled={reviewSaving}>이수</button>
             </div>
           </div>
         </div>
