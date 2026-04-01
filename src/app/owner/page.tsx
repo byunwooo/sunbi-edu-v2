@@ -223,7 +223,17 @@ export default function OwnerPage() {
                         {manual.sections.map(section => (
                           <div key={section.checklistId} className="mb-3 last:mb-0">
                             <p className="text-[12px] font-bold mb-1" style={{ color: "var(--text)" }}>{section.title}</p>
-                            <pre className="text-[11px] leading-relaxed whitespace-pre-wrap font-[inherit]" style={{ color: "var(--text-secondary)" }}>{section.content}</pre>
+                            <div className="text-[11px] leading-relaxed whitespace-pre-wrap font-[inherit]">
+                              {section.content.split('\n').map((line, li) => {
+                                const isImportant = line.includes('★');
+                                const displayLine = line.replace(/★/g, '');
+                                return (
+                                  <span key={li} style={{ color: isImportant ? "var(--danger)" : "var(--text-secondary)", fontWeight: isImportant ? 700 : 400 }}>
+                                    {isImportant && '⚠ '}{displayLine}{'\n'}
+                                  </span>
+                                );
+                              })}
+                            </div>
                           </div>
                         ))}
                       </div>
