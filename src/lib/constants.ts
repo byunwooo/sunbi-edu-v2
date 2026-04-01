@@ -19,9 +19,11 @@ export const CURRICULUM_STEPS = [
       { id: 'c2_1', label: '식품위생법 기본 이해', required: false },
       { id: 'c2_2', label: '개인 위생 관리 (복장, 손 세척, 건강관리)', required: true },
       { id: 'c2_3', label: '식자재 교차오염 방지 원칙', required: false },
-      { id: 'c2_4', label: '화기 및 칼 사용 시 안전수칙', required: false },
+      { id: 'c2_4', label: '화기, 칼, 제면기 사용 시 안전수칙', required: false },
       { id: 'c2_5', label: '화상/화재 응급 대처법', required: false },
       { id: 'c2_6', label: '매장 청결 기준 및 점검 방법', required: false },
+      { id: 'c2_7', label: '해충·방역 관리', required: false },
+      { id: 'c2_8', label: '안전 장비 위치 및 비상 대응', required: false },
     ],
   },
   {
