@@ -43,9 +43,27 @@ export const CURRICULUM_STEPS = [
     short: '기물 세팅',
     checklist: [
       { id: 'c4_1', label: '조리도구 종류 및 용도 파악', required: true },
-      { id: 'c4_2', label: '기물 세팅 위치 및 배치 기준', required: false },
-      { id: 'c4_3', label: '기물 세척 및 관리 방법', required: false },
+      { id: 'c4_2', label: '조리대·서빙대 기물 배치 위치 숙지', required: false },
+      { id: 'c4_3', label: '기물 세척 및 소독 방법', required: false },
       { id: 'c4_4', label: '영업 전/후 기물 점검 루틴', required: false },
+    ],
+    equipment: [
+      { name: '제면기 + 칼국수날', usage: '매장 직접 제면' },
+      { name: '슬러시아', usage: '육수 보관' },
+      { name: '사리냉각기', usage: '면 식히기 (콩국수, 냉국수)' },
+      { name: '냉장동', usage: '주방 메인 냉장/냉동' },
+      { name: '테이블냉동·냉장고', usage: '작업대 겸용' },
+      { name: '반찬냉장고', usage: '홀용 반찬 보관' },
+      { name: '음료냉장고', usage: '음료 진열' },
+      { name: '간택기', usage: '메인 조리 화구' },
+      { name: '낮은렌지', usage: '보조 화구' },
+      { name: '식기세척기', usage: '집기류 세척' },
+      { name: '세척씽크대', usage: '세척용' },
+      { name: '전기만두찜기', usage: '만두 찜용' },
+      { name: '믹서기', usage: '무즙, 양파/무 갈기' },
+      { name: '전기밥솥', usage: '홀 셀프바 밥' },
+      { name: '작업대', usage: '조리 작업용' },
+      { name: '벽선반', usage: '건조 식자재/소모품 보관' },
     ],
   },
   {
@@ -135,11 +153,17 @@ export type ChecklistItem = {
   required: boolean;
 };
 
+export type EquipmentItem = {
+  name: string;
+  usage: string;
+};
+
 export type CurriculumStep = {
   id: number;
   label: string;
   short: string;
   checklist: ChecklistItem[];
+  equipment?: EquipmentItem[];
 };
 
 export type Branch = {
