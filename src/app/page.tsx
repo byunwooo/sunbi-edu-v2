@@ -18,7 +18,7 @@ export default function LoginPage() {
     setLoading(true);
     setError("");
 
-    const { error: authError } = await supabase.auth.signInWithPassword({
+    const { data, error: authError } = await supabase.auth.signInWithPassword({
       email,
       password,
     });
@@ -29,7 +29,8 @@ export default function LoginPage() {
       return;
     }
 
-    router.push("/dashboard");
+    const role = data.user?.app_metadata?.role || data.user?.user_metadata?.role;
+    router.push(role === "owner" ? "/owner" : "/dashboard");
   };
 
   return (
@@ -47,7 +48,7 @@ export default function LoginPage() {
 
         <div className="bg-white rounded-2xl p-7 shadow-lg text-center">
           <h2 className="text-xl font-bold mb-1">로그인</h2>
-          <p className="text-sm mb-7" style={{ color: "var(--text-muted)" }}>본사 관리자 또는 SV 계정으로 로그인하세요</p>
+          <p className="text-sm mb-7" style={{ color: "var(--text-muted)" }}>관리자, SV 또는 점주 계정으로 로그인하세요</p>
 
           {error && <div className="text-sm mb-4 p-3 rounded-lg text-left" style={{ background: "var(--danger-bg)", color: "var(--danger)" }}>{error}</div>}
 

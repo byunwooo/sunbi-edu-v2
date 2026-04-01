@@ -24,6 +24,10 @@ export default function BranchesPage() {
   const [branchType, setBranchType] = useState<"new" | "existing">("new");
   const [existingComments, setExistingComments] = useState<{ [step: number]: string }>({});
   const [saving, setSaving] = useState(false);
+  const [ownerModal, setOwnerModal] = useState<Branch | null>(null);
+  const [ownerForm, setOwnerForm] = useState({ email: "", password: "" });
+  const [ownerSaving, setOwnerSaving] = useState(false);
+  const [ownerResult, setOwnerResult] = useState<{ success: boolean; message: string } | null>(null);
 
   const fetchBranches = async () => {
     setLoading(true);
@@ -84,6 +88,37 @@ export default function BranchesPage() {
     }
   };
 
+  const handleCreateOwner = async () => {
+    if (!ownerModal) return;
+    if (!ownerForm.email || !ownerForm.password) { alert("이메일과 비밀번호를 입력해주세요."); return; }
+    if (ownerForm.password.length < 6) { alert("비밀번호는 6자 이상이어야 합니다."); return; }
+    setOwnerSaving(true);
+    setOwnerResult(null);
+    try {
+      const res = await fetch("/api/create-owner", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          email: ownerForm.email,
+          password: ownerForm.password,
+          branch_id: ownerModal.id,
+          branch_name: ownerModal.name,
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        setOwnerResult({ success: false, message: data.error || "생성에 실패했습니다." });
+      } else {
+        setOwnerResult({ success: true, message: `점주 계정이 생성되었습니다.\n이메일: ${ownerForm.email}` });
+        setOwnerForm({ email: "", password: "" });
+      }
+    } catch {
+      setOwnerResult({ success: false, message: "네트워크 오류가 발생했습니다." });
+    } finally {
+      setOwnerSaving(false);
+    }
+  };
+
   const handleDelete = async (id: string) => {
     if (!confirm("이 지점을 삭제하시겠습니까?")) return;
     const { error } = await supabase.from('branches').delete().eq('id', id);
@@ -128,12 +163,15 @@ export default function BranchesPage() {
               <p className="text-sm mt-1" style={{ color: "var(--text-muted)" }}>{b.owner_name} · {b.phone || "연락처 없음"}</p>
               <span className="inline-block text-xs mt-2 px-2 py-0.5 rounded-md" style={{ background: "var(--bg-warm)", color: "var(--text-secondary)" }}>교육 시작일: {b.start_date}</span>
             </div>
-            {canEdit(role) && (
-              <div className="flex flex-col justify-center gap-1.5">
-                <button className="text-xs font-bold px-3 py-1.5 rounded-lg border-2 hover:opacity-80 transition-opacity cursor-pointer" style={{ borderColor: "var(--primary)", color: "var(--primary)" }} onClick={() => openEdit(b)}>수정</button>
-                <button className="text-xs font-bold px-3 py-1.5 rounded-lg border-2 hover:opacity-80 transition-opacity cursor-pointer" style={{ borderColor: "var(--danger)", color: "var(--danger)" }} onClick={() => handleDelete(b.id)}>삭제</button>
-              </div>
-            )}
+            <div className="flex flex-col justify-center gap-1.5">
+              <button className="text-xs font-bold px-3 py-1.5 rounded-lg border-2 hover:opacity-80 transition-opacity cursor-pointer" style={{ borderColor: "#3498db", color: "#3498db" }} onClick={() => { setOwnerModal(b); setOwnerForm({ email: "", password: "" }); setOwnerResult(null); }}>점주계정</button>
+              {canEdit(role) && (
+                <>
+                  <button className="text-xs font-bold px-3 py-1.5 rounded-lg border-2 hover:opacity-80 transition-opacity cursor-pointer" style={{ borderColor: "var(--primary)", color: "var(--primary)" }} onClick={() => openEdit(b)}>수정</button>
+                  <button className="text-xs font-bold px-3 py-1.5 rounded-lg border-2 hover:opacity-80 transition-opacity cursor-pointer" style={{ borderColor: "var(--danger)", color: "var(--danger)" }} onClick={() => handleDelete(b.id)}>삭제</button>
+                </>
+              )}
+            </div>
           </div>
           );
         })}
@@ -229,6 +267,38 @@ export default function BranchesPage() {
             <div className="grid grid-cols-2 gap-3 mt-6">
               <button className="py-3.5 rounded-xl font-semibold border text-[15px] hover:opacity-80 transition-opacity cursor-pointer" style={{ borderColor: "var(--border)", color: "var(--text-muted)" }} onClick={() => setModal(false)}>취소</button>
               <button className="py-3.5 rounded-xl font-bold text-white text-[15px] shadow-sm hover:opacity-90 transition-opacity cursor-pointer" style={{ background: "var(--primary)" }} onClick={handleSave} disabled={saving}>{saving ? "저장 중..." : "저장"}</button>
+            </div>
+          </div>
+        </div>
+      )}
+      {/* 점주 계정 생성 모달 */}
+      {ownerModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-5" style={{ background: "rgba(0,0,0,0.5)" }}>
+          <div className="bg-white rounded-2xl p-6 w-full max-w-md">
+            <h2 className="text-lg font-extrabold mb-1">점주 계정 생성</h2>
+            <p className="text-sm mb-5" style={{ color: "var(--text-muted)" }}>{ownerModal.name} · {ownerModal.owner_name}</p>
+
+            {ownerResult && (
+              <div className="text-sm mb-4 p-3 rounded-lg whitespace-pre-line" style={{ background: ownerResult.success ? "var(--success-bg)" : "var(--danger-bg)", color: ownerResult.success ? "var(--success)" : "var(--danger)" }}>
+                {ownerResult.message}
+              </div>
+            )}
+
+            {!ownerResult?.success && (
+              <>
+                <label className="block text-xs font-bold mb-1" style={{ color: "var(--text-secondary)" }}>이메일 <span style={{ color: "var(--danger)" }}>*</span></label>
+                <input className="w-full rounded-xl px-4 py-3 text-[15px] border mb-4" style={{ borderColor: "var(--border)", background: "var(--bg-warm)" }} placeholder="점주 이메일을 입력하세요" type="email" value={ownerForm.email} onChange={e => setOwnerForm(f => ({ ...f, email: e.target.value }))} />
+
+                <label className="block text-xs font-bold mb-1" style={{ color: "var(--text-secondary)" }}>비밀번호 <span style={{ color: "var(--danger)" }}>*</span></label>
+                <input className="w-full rounded-xl px-4 py-3 text-[15px] border mb-5" style={{ borderColor: "var(--border)", background: "var(--bg-warm)" }} placeholder="6자 이상" type="text" value={ownerForm.password} onChange={e => setOwnerForm(f => ({ ...f, password: e.target.value }))} />
+              </>
+            )}
+
+            <div className="grid grid-cols-2 gap-3">
+              <button className="py-3.5 rounded-xl font-semibold border text-[15px] hover:opacity-80 transition-opacity cursor-pointer" style={{ borderColor: "var(--border)", color: "var(--text-muted)" }} onClick={() => setOwnerModal(null)}>닫기</button>
+              {!ownerResult?.success && (
+                <button className="py-3.5 rounded-xl font-bold text-white text-[15px] shadow-sm hover:opacity-90 transition-opacity cursor-pointer" style={{ background: "#3498db" }} onClick={handleCreateOwner} disabled={ownerSaving}>{ownerSaving ? "생성 중..." : "계정 생성"}</button>
+              )}
             </div>
           </div>
         </div>
