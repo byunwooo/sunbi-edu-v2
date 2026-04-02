@@ -219,19 +219,37 @@ export default function OwnerPage() {
 
               {isExpanded && (
                 <div className="px-5 pb-4 pt-2">
-                  {/* 매뉴얼 학습 버튼 */}
-                  <button
-                    className="w-full mb-3 py-2.5 rounded-xl text-[13px] font-semibold flex items-center justify-center gap-2 border transition-all"
-                    style={{
-                      borderColor: manualStep === step.id ? "var(--primary)" : "var(--border-light)",
-                      background: manualStep === step.id ? "rgba(139,26,26,0.05)" : "var(--bg-warm)",
-                      color: manualStep === step.id ? "var(--primary)" : "var(--text-secondary)",
-                    }}
-                    onClick={() => setManualStep(manualStep === step.id ? null : step.id)}
-                  >
-                    <BookOpen size={14} />
-                    {manualStep === step.id ? "매뉴얼 닫기" : "매뉴얼 학습"}
-                  </button>
+                  {/* 매뉴얼 학습 / 교육 시작 버튼 */}
+                  {(() => {
+                    const hasStarted = requests.some(r => r.step === step.id);
+                    if (!hasStarted && !isCompleted) {
+                      // 교육 시작 전 — 교육 시작 버튼
+                      return (
+                        <button
+                          className="w-full mb-3 py-2.5 rounded-xl text-[13px] font-semibold flex items-center justify-center gap-2 text-white shadow-sm hover:opacity-90 transition-opacity"
+                          style={{ background: "#3498db" }}
+                          onClick={() => { setRequestModal(step.id); setRequestMsg(""); }}
+                        >
+                          <Play size={14} /> 교육 시작
+                        </button>
+                      );
+                    }
+                    // 교육 시작 후 — 매뉴얼 학습 버튼
+                    return (
+                      <button
+                        className="w-full mb-3 py-2.5 rounded-xl text-[13px] font-semibold flex items-center justify-center gap-2 border transition-all"
+                        style={{
+                          borderColor: manualStep === step.id ? "var(--primary)" : "var(--border-light)",
+                          background: manualStep === step.id ? "rgba(139,26,26,0.05)" : "var(--bg-warm)",
+                          color: manualStep === step.id ? "var(--primary)" : "var(--text-secondary)",
+                        }}
+                        onClick={() => setManualStep(manualStep === step.id ? null : step.id)}
+                      >
+                        <BookOpen size={14} />
+                        {manualStep === step.id ? "매뉴얼 닫기" : "매뉴얼 학습"}
+                      </button>
+                    );
+                  })()}
 
                   {/* 매뉴얼 콘텐츠 */}
                   {manualStep === step.id && (() => {
@@ -362,16 +380,8 @@ export default function OwnerPage() {
                       );
                     }
 
-                    // 아직 시작 안 한 단계
-                    return (
-                      <button
-                        className="w-full mt-3 py-2.5 rounded-xl text-[13px] font-semibold flex items-center justify-center gap-2 text-white shadow-sm hover:opacity-90 transition-opacity"
-                        style={{ background: "#3498db" }}
-                        onClick={() => { setRequestModal(step.id); setRequestMsg(""); }}
-                      >
-                        <Play size={14} /> 교육 시작
-                      </button>
-                    );
+                    // 아직 시작 안 한 단계 — 교육 시작 버튼은 상단으로 이동됨
+                    return null;
                   })()}
 
                   {/* 점수 & 코멘트 */}
