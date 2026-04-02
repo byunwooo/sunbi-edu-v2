@@ -4,6 +4,8 @@ import { useParams, useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase";
 import { CURRICULUM_STEPS, type Branch, type Record, type FinalComment } from "@/lib/constants";
 import { useAuth, canEdit } from "@/lib/auth-context";
+import { MANUAL_CONTENT } from "@/lib/manual-content";
+import { BookOpen } from "lucide-react";
 
 export default function BranchDetailPage() {
   const { id } = useParams();
@@ -25,6 +27,7 @@ export default function BranchDetailPage() {
   const [aiAnalysis, setAiAnalysis] = useState("");
   const [aiLoading, setAiLoading] = useState(false);
   const [aiError, setAiError] = useState("");
+  const [manualStep, setManualStep] = useState<number | null>(null);
 
   useEffect(() => {
     async function fetchData() {
@@ -256,6 +259,48 @@ export default function BranchDetailPage() {
                 {!latestRecord && (
                   <span className="text-xs px-2 py-1 rounded-md" style={{ background: "var(--bg-warm)", color: "var(--text-muted)" }}>대기</span>
                 )}
+              </div>
+
+              {/* 매뉴얼 학습 */}
+              <div className="mt-3">
+                <button
+                  className="w-full py-2 rounded-lg text-[12px] font-semibold flex items-center justify-center gap-2 border transition-all"
+                  style={{
+                    borderColor: manualStep === step.id ? "var(--primary)" : "var(--border-light)",
+                    background: manualStep === step.id ? "rgba(139,26,26,0.05)" : "var(--bg-warm)",
+                    color: manualStep === step.id ? "var(--primary)" : "var(--text-secondary)",
+                  }}
+                  onClick={() => setManualStep(manualStep === step.id ? null : step.id)}
+                >
+                  <BookOpen size={13} />
+                  {manualStep === step.id ? "매뉴얼 닫기" : "매뉴얼 보기"}
+                </button>
+
+                {manualStep === step.id && (() => {
+                  const manual = MANUAL_CONTENT.find(m => m.stepId === step.id);
+                  if (!manual) return null;
+                  return (
+                    <div className="mt-2 p-4 rounded-xl border" style={{ background: "rgba(139,26,26,0.02)", borderColor: "rgba(139,26,26,0.15)" }}>
+                      <p className="text-xs font-semibold mb-3" style={{ color: "var(--primary)" }}>{manual.overview}</p>
+                      {manual.sections.map(section => (
+                        <div key={section.checklistId} className="mb-3 last:mb-0">
+                          <p className="text-[12px] font-bold mb-1" style={{ color: "var(--text)" }}>{section.title}</p>
+                          <div className="text-[11px] leading-relaxed whitespace-pre-wrap font-[inherit]">
+                            {section.content.split('\n').map((line, li) => {
+                              const isImportant = line.includes('★');
+                              const displayLine = line.replace(/★/g, '');
+                              return (
+                                <span key={li} style={{ color: isImportant ? "var(--danger)" : "var(--text-secondary)", fontWeight: isImportant ? 700 : 400 }}>
+                                  {isImportant && '⚠ '}{displayLine}{'\n'}
+                                </span>
+                              );
+                            })}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  );
+                })()}
               </div>
 
               {/* 체크리스트 현황 */}
