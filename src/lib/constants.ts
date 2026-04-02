@@ -72,7 +72,7 @@ export const CURRICULUM_STEPS = [
     short: '전처리·보관',
     checklist: [
       { id: 'c5_1', label: '식자재별 전처리 방법 (채소, 육류, 해산물)', required: true },
-      { id: 'c5_2', label: '올바른 보관법 (냉장/냉동 온도 기준)', required: false },
+      { id: 'c5_2', label: '올바른 보관법', required: false },
       { id: 'c5_3', label: '유통기한 관리 및 선입선출 원칙', required: false },
       { id: 'c5_4', label: '식자재 상태 검수 방법', required: false },
     ],
