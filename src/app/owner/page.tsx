@@ -92,11 +92,27 @@ export default function OwnerPage() {
     );
   }
 
-  const submitRequest = async (step: number) => {
+  // 교육 시작 (모달 없이 바로)
+  const startEducation = async (step: number) => {
+    if (!user || !branch) return;
+    const { data, error } = await supabase.from("completion_requests").insert({
+      branch_id: branch.id,
+      step,
+      owner_id: user.id,
+      owner_message: "",
+    }).select().single();
+    if (error) {
+      alert("교육 시작에 실패했습니다.");
+      console.error(error);
+    } else if (data) {
+      setRequests(prev => [...prev, data]);
+    }
+  };
+
+  // 어려웠던 점 저장 (모달에서)
+  const submitMessage = async (step: number) => {
     if (!user || !branch) return;
     setRequestSaving(true);
-
-    // 이미 진행 중인 요청이 있으면 어려웠던 점 업데이트
     const existingPending = requests.find(r => r.step === step && r.status === "pending");
     if (existingPending) {
       const { error } = await supabase.from("completion_requests")
@@ -107,22 +123,6 @@ export default function OwnerPage() {
         console.error(error);
       } else {
         setRequests(prev => prev.map(r => r.id === existingPending.id ? { ...r, owner_message: requestMsg } : r));
-        setRequestModal(null);
-        setRequestMsg("");
-      }
-    } else {
-      // 새 교육 시작
-      const { data, error } = await supabase.from("completion_requests").insert({
-        branch_id: branch.id,
-        step,
-        owner_id: user.id,
-        owner_message: requestMsg,
-      }).select().single();
-      if (error) {
-        alert("교육 시작에 실패했습니다.");
-        console.error(error);
-      } else if (data) {
-        setRequests(prev => [...prev, data]);
         setRequestModal(null);
         setRequestMsg("");
       }
@@ -228,7 +228,7 @@ export default function OwnerPage() {
                         <button
                           className="w-full mb-3 py-2.5 rounded-xl text-[13px] font-semibold flex items-center justify-center gap-2 text-white shadow-sm hover:opacity-90 transition-opacity"
                           style={{ background: "#3498db" }}
-                          onClick={() => { setRequestModal(step.id); setRequestMsg(""); }}
+                          onClick={() => startEducation(step.id)}
                         >
                           <Play size={14} /> 교육 시작
                         </button>
@@ -354,7 +354,7 @@ export default function OwnerPage() {
                           <button
                             className="w-full py-2.5 rounded-xl text-[13px] font-semibold flex items-center justify-center gap-2 border hover:opacity-80 transition-opacity"
                             style={{ borderColor: "#3498db", color: "#3498db" }}
-                            onClick={() => { setRequestModal(step.id); setRequestMsg(""); }}
+                            onClick={() => startEducation(step.id)}
                           >
                             <Play size={14} /> 재교육 시작
                           </button>
@@ -420,18 +420,16 @@ export default function OwnerPage() {
           </div>
         )}
 
-        {/* 교육 시작 / 어려웠던 점 작성 모달 */}
+        {/* 어려웠던 점 작성 모달 */}
         {requestModal && (
           <div className="fixed inset-0 z-50 flex items-center justify-center p-5" style={{ background: "rgba(0,0,0,0.5)" }}>
             <div className="bg-white rounded-2xl p-6 w-full max-w-md">
-              <h2 className="text-lg font-extrabold mb-1">
-                {requests.some(r => r.step === requestModal && r.status === "pending") ? "어려웠던 점 작성" : "교육 시작"}
-              </h2>
+              <h2 className="text-lg font-extrabold mb-1">어려웠던 점 작성</h2>
               <p className="text-sm mb-5" style={{ color: "var(--text-muted)" }}>
                 {CURRICULUM_STEPS.find(s => s.id === requestModal)?.label}
               </p>
 
-              <label className="block text-xs font-bold mb-1" style={{ color: "var(--text-secondary)" }}>어려웠던 점 (선택)</label>
+              <label className="block text-xs font-bold mb-1" style={{ color: "var(--text-secondary)" }}>어려웠던 점</label>
               <textarea
                 className="w-full rounded-xl px-4 py-3 text-[14px] border mb-5 resize-none"
                 style={{ borderColor: "var(--border)", background: "var(--bg-warm)" }}
@@ -443,7 +441,7 @@ export default function OwnerPage() {
 
               <div className="grid grid-cols-2 gap-3">
                 <button className="py-3.5 rounded-xl font-semibold border text-[15px] hover:opacity-80 transition-opacity cursor-pointer" style={{ borderColor: "var(--border)", color: "var(--text-muted)" }} onClick={() => setRequestModal(null)}>취소</button>
-                <button className="py-3.5 rounded-xl font-bold text-white text-[15px] shadow-sm hover:opacity-90 transition-opacity cursor-pointer" style={{ background: "#3498db" }} onClick={() => submitRequest(requestModal)} disabled={requestSaving}>{requestSaving ? "저장 중..." : requests.some(r => r.step === requestModal && r.status === "pending") ? "저장" : "교육 시작"}</button>
+                <button className="py-3.5 rounded-xl font-bold text-white text-[15px] shadow-sm hover:opacity-90 transition-opacity cursor-pointer" style={{ background: "#3498db" }} onClick={() => submitMessage(requestModal)} disabled={requestSaving}>{requestSaving ? "저장 중..." : "저장"}</button>
               </div>
             </div>
           </div>
