@@ -24,6 +24,7 @@ export default function DashboardPage() {
   const [reviewSaving, setReviewSaving] = useState(false);
   const [expandedBranch, setExpandedBranch] = useState<string | null>(null);
   const [expandedRequest, setExpandedRequest] = useState<string | null>(null);
+  const [reviewChecklist, setReviewChecklist] = useState<{ [key: string]: boolean }>({});
 
   useEffect(() => {
     async function fetchData() {
@@ -59,18 +60,19 @@ export default function DashboardPage() {
     } else {
       // 승인 시 교육 기록(records) 자동 생성
       if (status === 'approved') {
-        const step = CURRICULUM_STEPS.find(s => s.id === reviewModal.step);
-        const checklistStatus: { [key: string]: boolean } = {};
-        step?.checklist.forEach(item => { checklistStatus[item.id] = true; });
-        await supabase.from('records').insert({
+        const { data: newRecord } = await supabase.from('records').insert({
           branch_id: reviewModal.branch_id,
           step: reviewModal.step,
           passed: true,
           score: null,
           sv_comment: reviewComment || '',
           owner_comment: reviewModal.owner_message || '',
-          checklist_status: checklistStatus,
-        });
+          checklist_status: reviewChecklist,
+          started_at: reviewModal.created_at,
+        }).select().single();
+        if (newRecord) {
+          setRecords(prev => [...prev, newRecord]);
+        }
       }
       setRequests(prev => prev.filter(r => r.id !== reviewModal.id));
       setReviewModal(null);
@@ -158,7 +160,7 @@ export default function DashboardPage() {
                         {branchReqs.map(req => {
                           const stepInfo = CURRICULUM_STEPS.find(s => s.id === req.step);
                           return (
-                            <div key={req.id} className="mt-3 p-3 rounded-xl cursor-pointer hover:opacity-80 transition-opacity" style={{ background: "rgba(52,152,219,0.04)", border: "1px solid rgba(52,152,219,0.12)" }} onClick={() => { setReviewModal(req); setReviewComment(""); }}>
+                            <div key={req.id} className="mt-3 p-3 rounded-xl cursor-pointer hover:opacity-80 transition-opacity" style={{ background: "rgba(52,152,219,0.04)", border: "1px solid rgba(52,152,219,0.12)" }} onClick={() => { setReviewModal(req); setReviewComment(""); setReviewChecklist({}); }}>
                               <div className="flex justify-between items-center">
                                 <div>
                                   <p className="text-[13px] font-semibold">{stepInfo?.label}</p>
@@ -283,21 +285,32 @@ export default function DashboardPage() {
               {CURRICULUM_STEPS.find(s => s.id === reviewModal.step)?.label}
             </p>
 
-            {/* 해당 단계 체크리스트 */}
+            {/* 해당 단계 체크리스트 — SV가 직접 체크 */}
             {(() => {
               const step = CURRICULUM_STEPS.find(s => s.id === reviewModal.step);
               if (!step) return null;
+              const requiredIds = step.checklist.filter(i => i.required).map(i => i.id);
+              const allRequiredChecked = requiredIds.every(id => reviewChecklist[id]);
               return (
                 <div className="mb-4 p-3 rounded-xl" style={{ background: "var(--bg-warm)" }}>
-                  <p className="text-xs font-bold mb-2" style={{ color: "var(--text-secondary)" }}>체크리스트 항목</p>
+                  <p className="text-xs font-bold mb-2" style={{ color: "var(--text-secondary)" }}>체크리스트 확인</p>
                   {step.checklist.map(item => (
-                    <div key={item.id} className="flex items-center gap-2 py-1">
-                      <span className="text-[13px]" style={{ color: "var(--text)" }}>
+                    <label key={item.id} className="flex items-center gap-2.5 py-1.5 cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={!!reviewChecklist[item.id]}
+                        onChange={e => setReviewChecklist(prev => ({ ...prev, [item.id]: e.target.checked }))}
+                        className="w-4 h-4 rounded accent-[var(--success)]"
+                      />
+                      <span className="text-[13px]" style={{ color: reviewChecklist[item.id] ? "var(--text)" : "var(--text-muted)" }}>
                         {item.required && <span className="font-bold" style={{ color: "var(--primary)" }}>★ </span>}
                         {item.label}
                       </span>
-                    </div>
+                    </label>
                   ))}
+                  {!allRequiredChecked && (
+                    <p className="text-[11px] mt-2 font-semibold" style={{ color: "var(--danger)" }}>★ 필수 항목을 모두 체크해야 이수 처리할 수 있습니다</p>
+                  )}
                 </div>
               );
             })()}
@@ -319,11 +332,18 @@ export default function DashboardPage() {
               onChange={e => setReviewComment(e.target.value)}
             />
 
-            <div className="grid grid-cols-3 gap-2">
-              <button className="py-3 rounded-xl font-semibold border text-[14px] hover:opacity-80 transition-opacity cursor-pointer" style={{ borderColor: "var(--border)", color: "var(--text-muted)" }} onClick={() => setReviewModal(null)}>닫기</button>
-              <button className="py-3 rounded-xl font-bold text-white text-[14px] shadow-sm hover:opacity-90 transition-opacity cursor-pointer" style={{ background: "var(--danger)" }} onClick={() => handleReview('rejected')} disabled={reviewSaving}>미이수</button>
-              <button className="py-3 rounded-xl font-bold text-white text-[14px] shadow-sm hover:opacity-90 transition-opacity cursor-pointer" style={{ background: "var(--success)" }} onClick={() => handleReview('approved')} disabled={reviewSaving}>이수</button>
-            </div>
+            {(() => {
+              const step = CURRICULUM_STEPS.find(s => s.id === reviewModal.step);
+              const requiredIds = step?.checklist.filter(i => i.required).map(i => i.id) || [];
+              const allRequiredChecked = requiredIds.every(id => reviewChecklist[id]);
+              return (
+                <div className="grid grid-cols-3 gap-2">
+                  <button className="py-3 rounded-xl font-semibold border text-[14px] hover:opacity-80 transition-opacity cursor-pointer" style={{ borderColor: "var(--border)", color: "var(--text-muted)" }} onClick={() => setReviewModal(null)}>닫기</button>
+                  <button className="py-3 rounded-xl font-bold text-white text-[14px] shadow-sm hover:opacity-90 transition-opacity cursor-pointer" style={{ background: "var(--danger)" }} onClick={() => handleReview('rejected')} disabled={reviewSaving}>미이수</button>
+                  <button className="py-3 rounded-xl font-bold text-white text-[14px] shadow-sm transition-opacity cursor-pointer" style={{ background: allRequiredChecked ? "var(--success)" : "#ccc" }} onClick={() => allRequiredChecked && handleReview('approved')} disabled={reviewSaving || !allRequiredChecked}>이수</button>
+                </div>
+              );
+            })()}
           </div>
         </div>
       )}
