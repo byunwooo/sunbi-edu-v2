@@ -149,7 +149,7 @@ export default function DashboardPage() {
                         <span className="text-[11px] font-semibold px-2 py-0.5 rounded-full" style={{ background: "rgba(52,152,219,0.1)", color: "#3498db" }}>{branchReqs.length}건 대기</span>
                       </div>
                       <div className="flex items-center gap-2">
-                        <span className="text-xs" style={{ color: "var(--text-muted)" }}>{reqBranch?.owner_name}</span>
+                        <span className="text-xs font-semibold" style={{ color: "#3498db" }}>{isExpanded ? "닫기" : "열기"}</span>
                         <span className="text-xs transition-transform" style={{ color: "var(--text-muted)", transform: isExpanded ? "rotate(180deg)" : "rotate(0deg)" }}>▼</span>
                       </div>
                     </div>
