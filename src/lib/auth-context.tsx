@@ -53,6 +53,51 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   return (
     <AuthContext.Provider value={{ user, role, loading, signOut }}>
       {children}
+      {user && (
+        <div
+          style={{
+            position: "fixed",
+            top: 0,
+            left: 0,
+            width: "100%",
+            height: "100%",
+            pointerEvents: "none",
+            zIndex: 9999,
+            overflow: "hidden",
+          }}
+        >
+          <div
+            style={{
+              position: "absolute",
+              top: "-50%",
+              left: "-50%",
+              width: "200%",
+              height: "200%",
+              transform: "rotate(-25deg)",
+              display: "flex",
+              flexWrap: "wrap",
+              gap: "80px",
+              alignContent: "flex-start",
+              padding: "40px",
+            }}
+          >
+            {Array.from({ length: 60 }).map((_, i) => (
+              <span
+                key={i}
+                style={{
+                  fontSize: "13px",
+                  color: "rgba(0,0,0,0.04)",
+                  fontWeight: 600,
+                  whiteSpace: "nowrap",
+                  userSelect: "none",
+                }}
+              >
+                {user.email} · {new Date().toLocaleDateString("ko-KR")}
+              </span>
+            ))}
+          </div>
+        </div>
+      )}
     </AuthContext.Provider>
   );
 }

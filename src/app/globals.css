@@ -34,6 +34,22 @@ body {
 
 input, textarea, select, button { font-family: inherit; }
 
+/* 매뉴얼 콘텐츠 복사 방지 */
+body {
+  -webkit-user-select: none;
+  -moz-user-select: none;
+  -ms-user-select: none;
+  user-select: none;
+}
+
+/* 입력 필드는 선택 허용 */
+input, textarea {
+  -webkit-user-select: text;
+  -moz-user-select: text;
+  -ms-user-select: text;
+  user-select: text;
+}
+
 input:focus, textarea:focus, select:focus {
   outline: none;
   border-color: var(--primary) !important;
