@@ -274,14 +274,33 @@ export default function DashboardPage() {
       {/* 교육 평가 모달 (이수/미이수) */}
       {reviewModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-5" style={{ background: "rgba(0,0,0,0.5)" }}>
-          <div className="bg-white rounded-2xl p-6 w-full max-w-md">
+          <div className="bg-white rounded-2xl p-6 w-full max-w-md max-h-[85vh] overflow-y-auto">
             <h2 className="text-lg font-extrabold mb-1">교육 평가</h2>
             <p className="text-sm mb-1" style={{ color: "var(--text-muted)" }}>
               {branches.find(b => b.id === reviewModal.branch_id)?.name} · {branches.find(b => b.id === reviewModal.branch_id)?.owner_name}
             </p>
-            <p className="text-sm font-semibold mb-4" style={{ color: "var(--primary)" }}>
+            <p className="text-sm font-semibold mb-3" style={{ color: "var(--primary)" }}>
               {CURRICULUM_STEPS.find(s => s.id === reviewModal.step)?.label}
             </p>
+
+            {/* 해당 단계 체크리스트 */}
+            {(() => {
+              const step = CURRICULUM_STEPS.find(s => s.id === reviewModal.step);
+              if (!step) return null;
+              return (
+                <div className="mb-4 p-3 rounded-xl" style={{ background: "var(--bg-warm)" }}>
+                  <p className="text-xs font-bold mb-2" style={{ color: "var(--text-secondary)" }}>체크리스트 항목</p>
+                  {step.checklist.map(item => (
+                    <div key={item.id} className="flex items-center gap-2 py-1">
+                      <span className="text-[13px]" style={{ color: "var(--text)" }}>
+                        {item.required && <span className="font-bold" style={{ color: "var(--primary)" }}>★ </span>}
+                        {item.label}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              );
+            })()}
 
             {reviewModal.owner_message && (
               <div className="text-xs p-3 rounded-lg mb-4" style={{ background: "rgba(52,152,219,0.06)", border: "1px solid rgba(52,152,219,0.15)" }}>
@@ -290,11 +309,11 @@ export default function DashboardPage() {
               </div>
             )}
 
-            <label className="block text-xs font-bold mb-1" style={{ color: "var(--text-secondary)" }}>점주가 어려워했던 점 (선택)</label>
+            <label className="block text-xs font-bold mb-1" style={{ color: "var(--text-secondary)" }}>SV 코멘트 (반려 시 점주에게 전달됩니다)</label>
             <textarea
               className="w-full rounded-xl px-4 py-3 text-[14px] border mb-5 resize-none"
               style={{ borderColor: "var(--border)", background: "var(--bg-warm)" }}
-              placeholder="교육하면서 점주가 어려워했던 부분을 적어주세요"
+              placeholder="어려워했던 점, 보완할 부분 등을 적어주세요"
               rows={3}
               value={reviewComment}
               onChange={e => setReviewComment(e.target.value)}
