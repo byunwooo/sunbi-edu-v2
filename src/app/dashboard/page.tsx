@@ -110,11 +110,6 @@ export default function DashboardPage() {
 
       <main className="max-w-xl mx-auto px-5 py-6">
         {/* 메뉴 카드 */}
-        <Link href="/record" className="block rounded-2xl p-5 mb-3 shadow-lg hover:opacity-95 transition-opacity no-underline" style={{ background: "var(--primary)" }}>
-          <h2 className="text-[17px] font-bold text-white">교육 기록 입력</h2>
-          <p className="text-[13px] mt-1" style={{ color: "rgba(255,255,255,0.7)" }}>지점별 교육 내용 및 평가 기록</p>
-        </Link>
-
         <div className="grid grid-cols-2 gap-3 mb-8">
           <Link href="/branches" className="block bg-white rounded-2xl p-5 border shadow-sm hover:shadow-md transition-shadow no-underline" style={{ borderColor: "var(--border-light)" }}>
             <h3 className="text-[15px] font-bold" style={{ color: "var(--text)" }}>지점 관리</h3>
