@@ -211,7 +211,7 @@ export default function BranchesPage() {
                   </button>
                 </div>
                 {branchType === "existing" && (
-                  <p className="text-xs mt-2" style={{ color: "var(--text-muted)" }}>이미 교육이 완료된 지점입니다. 8단계 전체 이수 완료로 등록됩니다.</p>
+                  <p className="text-xs mt-2" style={{ color: "var(--text-muted)" }}>이미 교육이 완료된 지점입니다. 11단계 전체 이수 완료로 등록됩니다.</p>
                 )}
               </div>
             )}

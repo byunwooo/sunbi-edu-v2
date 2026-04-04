@@ -40,7 +40,7 @@ export async function POST(req: NextRequest) {
 
     const prompt = `당신은 프랜차이즈 교육 분석 전문가입니다. 선비칼국수 프랜차이즈의 가맹점 교육 데이터를 분석해주세요.
 
-## 커리큘럼 (8단계)
+## 커리큘럼 (11단계)
 ${curriculum.map((s: { id: number; label: string }) => `${s.id}. ${s.label}`).join('\n')}
 
 ## 지점별 교육 데이터
