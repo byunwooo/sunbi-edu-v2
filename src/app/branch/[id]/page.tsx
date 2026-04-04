@@ -2,7 +2,7 @@
 import { useState, useEffect } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase";
-import { CURRICULUM_STEPS, type Branch, type Record, type FinalComment } from "@/lib/constants";
+import { CURRICULUM_STEPS, type Branch, type Record, type FinalComment, type CompletionRequest } from "@/lib/constants";
 import { useAuth, canEdit } from "@/lib/auth-context";
 import { MANUAL_CONTENT } from "@/lib/manual-content";
 import { BookOpen } from "lucide-react";
@@ -13,6 +13,7 @@ export default function BranchDetailPage() {
   const { role } = useAuth();
   const [branch, setBranch] = useState<Branch | null>(null);
   const [records, setRecords] = useState<Record[]>([]);
+  const [completionRequests, setCompletionRequests] = useState<CompletionRequest[]>([]);
   const [finalComment, setFinalComment] = useState<FinalComment | null>(null);
   const [loading, setLoading] = useState(true);
   const [editingStep, setEditingStep] = useState<number | null>(null);
@@ -47,6 +48,12 @@ export default function BranchDetailPage() {
         .order('created_at', { ascending: true });
       if (recordError) { console.error(recordError); }
 
+      const { data: requestData } = await supabase
+        .from('completion_requests')
+        .select('*')
+        .eq('branch_id', id)
+        .order('created_at', { ascending: true });
+
       const { data: finalData, error: finalError } = await supabase
         .from('final_comments')
         .select('*')
@@ -56,6 +63,7 @@ export default function BranchDetailPage() {
 
       setBranch(branchData || null);
       setRecords(recordData || []);
+      setCompletionRequests(requestData || []);
       if (finalData) {
         setFinalComment(finalData);
         setFinalSv(finalData.sv_comment || "");
@@ -322,6 +330,43 @@ export default function BranchDetailPage() {
                   </div>
                 </div>
               )}
+
+              {/* 교육 이력 타임라인 */}
+              {(() => {
+                const stepRequests = completionRequests.filter(r => r.step === step.id);
+                if (stepRequests.length === 0) return null;
+                return (
+                  <div className="mt-3 pt-3 border-t" style={{ borderColor: "var(--border-light)" }}>
+                    <p className="text-[11px] font-bold mb-2" style={{ color: "var(--text-secondary)" }}>교육 이력 ({stepRequests.length}회)</p>
+                    <div className="space-y-2">
+                      {stepRequests.map((req, idx) => {
+                        const statusColor = req.status === "approved" ? "var(--success)" : req.status === "rejected" ? "var(--danger)" : "#3498db";
+                        const statusLabel = req.status === "approved" ? "이수" : req.status === "rejected" ? "반려" : "진행 중";
+                        return (
+                          <div key={req.id} className="flex gap-2.5">
+                            <div className="flex flex-col items-center">
+                              <div className="w-2 h-2 rounded-full mt-1" style={{ background: statusColor }} />
+                              {idx < stepRequests.length - 1 && <div className="w-0.5 flex-1 mt-1" style={{ background: "var(--border-light)" }} />}
+                            </div>
+                            <div className="flex-1 pb-2">
+                              <div className="flex items-center gap-2">
+                                <span className="text-[11px] font-semibold" style={{ color: statusColor }}>{statusLabel}</span>
+                                <span className="text-[10px]" style={{ color: "var(--text-muted)" }}>{new Date(req.created_at).toLocaleDateString("ko-KR")}{req.reviewed_at ? ` → ${new Date(req.reviewed_at).toLocaleDateString("ko-KR")}` : ""}</span>
+                              </div>
+                              {req.owner_message && (
+                                <p className="text-[11px] mt-0.5" style={{ color: "var(--text-muted)" }}>점주: {req.owner_message}</p>
+                              )}
+                              {req.reviewer_comment && (
+                                <p className="text-[11px] mt-0.5" style={{ color: "var(--text-secondary)" }}>SV: {req.reviewer_comment}</p>
+                              )}
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                );
+              })()}
 
               {/* 코멘트 - 읽기 모드 */}
               {latestRecord && !isEditing && (
