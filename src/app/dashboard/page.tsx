@@ -25,6 +25,8 @@ export default function DashboardPage() {
   const [expandedBranch, setExpandedBranch] = useState<string | null>(null);
   const [expandedRequest, setExpandedRequest] = useState<string | null>(null);
   const [reviewChecklist, setReviewChecklist] = useState<{ [key: string]: boolean }>({});
+  const [searchQuery, setSearchQuery] = useState("");
+  const [statusFilter, setStatusFilter] = useState<"all" | "complete" | "progress" | "notStarted">("all");
 
   useEffect(() => {
     async function fetchData() {
@@ -58,21 +60,19 @@ export default function DashboardPage() {
       alert('처리에 실패했습니다.');
       console.error(error);
     } else {
-      // 승인 시 교육 기록(records) 자동 생성
-      if (status === 'approved') {
-        const { data: newRecord } = await supabase.from('records').insert({
-          branch_id: reviewModal.branch_id,
-          step: reviewModal.step,
-          passed: true,
-          score: null,
-          sv_comment: reviewComment || '',
-          owner_comment: reviewModal.owner_message || '',
-          checklist_status: reviewChecklist,
-          started_at: reviewModal.created_at,
-        }).select().single();
-        if (newRecord) {
-          setRecords(prev => [...prev, newRecord]);
-        }
+      // 교육 기록(records) 생성 — 이수/미이수 모두 저장
+      const { data: newRecord } = await supabase.from('records').insert({
+        branch_id: reviewModal.branch_id,
+        step: reviewModal.step,
+        passed: status === 'approved',
+        score: null,
+        sv_comment: reviewComment || '',
+        owner_comment: reviewModal.owner_message || '',
+        checklist_status: reviewChecklist,
+        started_at: reviewModal.created_at,
+      }).select().single();
+      if (newRecord) {
+        setRecords(prev => [...prev, newRecord]);
       }
       setRequests(prev => prev.filter(r => r.id !== reviewModal.id));
       setReviewModal(null);
@@ -198,22 +198,43 @@ export default function DashboardPage() {
           const progressCount = branchList.filter(b => b.status === "progress").length;
           const notStartedCount = branchList.filter(b => b.status === "notStarted").length;
 
+          const filteredList = branchList.filter(b => {
+            const matchesSearch = !searchQuery || b.name.includes(searchQuery) || b.owner_name.includes(searchQuery);
+            const matchesStatus = statusFilter === "all" || b.status === statusFilter;
+            return matchesSearch && matchesStatus;
+          });
+
           return (
             <>
-              <div className="flex items-center justify-between mb-4">
+              <div className="flex items-center justify-between mb-3">
                 <h2 className="text-[15px] font-bold">교육 현황</h2>
-                <div className="flex gap-2">
-                  {completeCount > 0 && <span className="text-xs font-semibold px-2 py-0.5 rounded-full" style={{ background: "rgba(26,122,58,0.1)", color: "var(--success)" }}>{completeCount} 완료</span>}
-                  {progressCount > 0 && <span className="text-xs font-semibold px-2 py-0.5 rounded-full" style={{ background: "rgba(230,126,34,0.1)", color: "#e67e22" }}>{progressCount} 진행 중</span>}
-                  {notStartedCount > 0 && <span className="text-xs font-semibold px-2 py-0.5 rounded-full" style={{ background: "rgba(149,165,166,0.1)", color: "#95a5a6" }}>{notStartedCount} 시작 전</span>}
-                </div>
+                <span className="text-xs" style={{ color: "var(--text-muted)" }}>{filteredList.length}/{branchList.length}개 지점</span>
               </div>
-              {branchList.length === 0 && (
+
+              {/* 검색 */}
+              <input
+                type="text"
+                placeholder="지점명 또는 점주명 검색"
+                value={searchQuery}
+                onChange={e => setSearchQuery(e.target.value)}
+                className="w-full rounded-xl px-4 py-2.5 text-[13px] border mb-3"
+                style={{ borderColor: "var(--border)", background: "white" }}
+              />
+
+              {/* 상태 필터 */}
+              <div className="flex gap-2 mb-4">
+                <button className="text-xs font-semibold px-3 py-1.5 rounded-full border cursor-pointer transition-opacity" style={{ background: statusFilter === "all" ? "var(--primary)" : "white", color: statusFilter === "all" ? "white" : "var(--text-muted)", borderColor: statusFilter === "all" ? "var(--primary)" : "var(--border)" }} onClick={() => setStatusFilter("all")}>전체</button>
+                {progressCount > 0 && <button className="text-xs font-semibold px-3 py-1.5 rounded-full border cursor-pointer transition-opacity" style={{ background: statusFilter === "progress" ? "#e67e22" : "white", color: statusFilter === "progress" ? "white" : "#e67e22", borderColor: statusFilter === "progress" ? "#e67e22" : "rgba(230,126,34,0.3)" }} onClick={() => setStatusFilter(statusFilter === "progress" ? "all" : "progress")}>{progressCount} 진행 중</button>}
+                {completeCount > 0 && <button className="text-xs font-semibold px-3 py-1.5 rounded-full border cursor-pointer transition-opacity" style={{ background: statusFilter === "complete" ? "var(--success)" : "white", color: statusFilter === "complete" ? "white" : "var(--success)", borderColor: statusFilter === "complete" ? "var(--success)" : "rgba(26,122,58,0.3)" }} onClick={() => setStatusFilter(statusFilter === "complete" ? "all" : "complete")}>{completeCount} 완료</button>}
+                {notStartedCount > 0 && <button className="text-xs font-semibold px-3 py-1.5 rounded-full border cursor-pointer transition-opacity" style={{ background: statusFilter === "notStarted" ? "#95a5a6" : "white", color: statusFilter === "notStarted" ? "white" : "#95a5a6", borderColor: statusFilter === "notStarted" ? "#95a5a6" : "rgba(149,165,166,0.3)" }} onClick={() => setStatusFilter(statusFilter === "notStarted" ? "all" : "notStarted")}>{notStartedCount} 시작 전</button>}
+              </div>
+
+              {filteredList.length === 0 && (
                 <div className="text-center py-10">
-                  <p className="text-sm" style={{ color: "var(--text-muted)" }}>등록된 지점이 없습니다</p>
+                  <p className="text-sm" style={{ color: "var(--text-muted)" }}>{branchList.length === 0 ? "등록된 지점이 없습니다" : "검색 결과가 없습니다"}</p>
                 </div>
               )}
-              {branchList.map(branch => {
+              {filteredList.map(branch => {
                 const statusColor = branch.status === "complete" ? "var(--success)" : branch.status === "progress" ? "#e67e22" : "#95a5a6";
                 const statusBorder = branch.status === "complete" ? "rgba(26,122,58,0.3)" : branch.status === "progress" ? "rgba(230,126,34,0.3)" : "var(--border-light)";
                 const statusLabel = branch.status === "complete" ? "완료" : branch.status === "progress" ? "진행 중" : "시작 전";
