@@ -160,7 +160,7 @@ export default function DashboardPage() {
                         {branchReqs.map(req => {
                           const stepInfo = CURRICULUM_STEPS.find(s => s.id === req.step);
                           return (
-                            <div key={req.id} className="mt-3 p-3 rounded-xl cursor-pointer hover:opacity-80 transition-opacity" style={{ background: "rgba(52,152,219,0.04)", border: "1px solid rgba(52,152,219,0.12)" }} onClick={() => { setReviewModal(req); setReviewComment(""); setReviewChecklist({}); }}>
+                            <div key={req.id} className="mt-3 p-3 rounded-xl cursor-pointer hover:opacity-80 transition-opacity" style={{ background: "rgba(52,152,219,0.04)", border: "1px solid rgba(52,152,219,0.12)" }} onClick={() => { const prevRecord = records.filter(r => r.branch_id === req.branch_id && r.step === req.step).sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())[0]; setReviewModal(req); setReviewComment(""); setReviewChecklist(prevRecord?.checklist_status || {}); }}>
                               <div className="flex justify-between items-center">
                                 <div>
                                   <p className="text-[13px] font-semibold">{stepInfo?.label}</p>
