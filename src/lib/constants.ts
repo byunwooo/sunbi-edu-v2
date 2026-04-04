@@ -51,7 +51,7 @@ export const CURRICULUM_STEPS = [
       { name: '제면기 + 칼국수날', usage: '매장 직접 제면' },
       { name: '슬러시아', usage: '육수 보관' },
       { name: '사리냉각기', usage: '면 식히기 (콩국수, 냉국수)' },
-      { name: '냉장동', usage: '주방 메인 냉장/냉동' },
+      { name: '45박스 냉장고', usage: '주방 메인 냉장/냉동' },
       { name: '테이블냉동·냉장고', usage: '작업대 겸용' },
       { name: '반찬냉장고', usage: '홀용 반찬 보관' },
       { name: '음료냉장고', usage: '음료 진열' },
@@ -106,10 +106,10 @@ export const CURRICULUM_STEPS = [
     short: '홀·응대',
     checklist: [
       { id: 'c8_1', label: '고객 맞이 인사 및 안내', required: false },
-      { id: 'c8_2', label: '주문 접수 방법 (테이블 오더/구두)', required: false },
+      { id: 'c8_2', label: '주문 접수 방법 (테이블오더/구두)', required: false },
       { id: 'c8_3', label: '서빙 매너 및 동선', required: false },
       { id: 'c8_4', label: '고객 불만/클레임 대응 매뉴얼', required: true },
-      { id: 'c8_5', label: '단골 고객 응대 팁', required: false },
+      { id: 'c8_5', label: '단골 고객 응대 TIP', required: false },
     ],
   },
   {
@@ -121,8 +121,8 @@ export const CURRICULUM_STEPS = [
       { id: 'c9_2', label: '결제 유형별 처리 (카드/현금/복합/모바일)', required: false },
       { id: 'c9_3', label: '반품(취소)·영수증·현금영수증 처리', required: false },
       { id: 'c9_4', label: '마감 정산 및 마감 취소', required: false },
-      { id: 'c9_5', label: '테이블 오더 관리자 모드 및 테블릿 관리', required: false },
-      { id: 'c9_6', label: '테이블 오더 결제 (개인/더치페이)', required: false },
+      { id: 'c9_5', label: '테이블오더 관리자 모드 및 테이블오더 기기 관리', required: false },
+      { id: 'c9_6', label: '테이블오더 결제 (개인/더치페이)', required: false },
     ],
   },
   {
