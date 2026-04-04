@@ -22,6 +22,7 @@ export default function DashboardPage() {
   const [reviewModal, setReviewModal] = useState<CompletionRequest | null>(null);
   const [reviewComment, setReviewComment] = useState("");
   const [reviewSaving, setReviewSaving] = useState(false);
+  const [expandedBranch, setExpandedBranch] = useState<string | null>(null);
 
   useEffect(() => {
     async function fetchData() {
@@ -190,39 +191,53 @@ export default function DashboardPage() {
                 const statusBorder = branch.status === "complete" ? "rgba(26,122,58,0.3)" : branch.status === "progress" ? "rgba(230,126,34,0.3)" : "var(--border-light)";
                 const statusLabel = branch.status === "complete" ? "완료" : branch.status === "progress" ? "진행 중" : "시작 전";
                 const statusBg = branch.status === "complete" ? "rgba(26,122,58,0.08)" : branch.status === "progress" ? "rgba(230,126,34,0.08)" : "rgba(149,165,166,0.08)";
+                const isExpanded = expandedBranch === branch.id;
 
                 return (
-                  <div key={branch.id} className="bg-white rounded-2xl p-5 mb-3 border shadow-sm cursor-pointer hover:shadow-md transition-shadow" style={{ borderColor: statusBorder, borderLeftWidth: 4, borderLeftColor: statusColor }} onClick={() => router.push(`/branch/${branch.id}`)}>
-                    <div className="flex justify-between mb-3">
-                      <div>
-                        <div className="flex items-center gap-2">
-                          <h3 className="text-[17px] font-bold">{branch.name}</h3>
-                          <span className="text-[11px] font-semibold px-2 py-0.5 rounded-full" style={{ background: statusBg, color: statusColor }}>{statusLabel}</span>
+                  <div key={branch.id} className="bg-white rounded-2xl mb-3 border shadow-sm overflow-hidden" style={{ borderColor: statusBorder, borderLeftWidth: 4, borderLeftColor: statusColor }}>
+                    {/* 접힌 상태: 지점명 + 상태 + 퍼센트 */}
+                    <div className="p-4 cursor-pointer hover:bg-gray-50 transition-colors flex justify-between items-center" onClick={() => setExpandedBranch(isExpanded ? null : branch.id)}>
+                      <div className="flex items-center gap-2">
+                        <h3 className="text-[15px] font-bold">{branch.name}</h3>
+                        <span className="text-[11px] font-semibold px-2 py-0.5 rounded-full" style={{ background: statusBg, color: statusColor }}>{statusLabel}</span>
+                      </div>
+                      <div className="flex items-center gap-3">
+                        <span className="text-lg font-extrabold" style={{ color: statusColor }}>{branch.pct}%</span>
+                        <span className="text-xs transition-transform" style={{ color: "var(--text-muted)", transform: isExpanded ? "rotate(180deg)" : "rotate(0deg)" }}>▼</span>
+                      </div>
+                    </div>
+
+                    {/* 펼친 상태: 상세 정보 */}
+                    {isExpanded && (
+                      <div className="px-4 pb-4 border-t" style={{ borderColor: "var(--border-light)" }}>
+                        <div className="flex justify-between items-center mt-3 mb-3">
+                          <p className="text-xs" style={{ color: "var(--text-muted)" }}>{branch.owner_name} · {branch.branchRecords.length}건 기록</p>
+                          <p className="text-xs font-semibold" style={{ color: statusColor }}>{branch.completedSteps}/{CURRICULUM_STEPS.length}단계</p>
                         </div>
-                        <p className="text-xs mt-1" style={{ color: "var(--text-muted)" }}>{branch.owner_name} · {branch.branchRecords.length}건 기록</p>
-                      </div>
-                      <div className="text-right">
-                        <span className="text-2xl font-extrabold" style={{ color: statusColor }}>{branch.pct}%</span>
-                        <p className="text-xs" style={{ color: "var(--text-muted)" }}>{branch.completedSteps}/{CURRICULUM_STEPS.length}단계</p>
-                      </div>
-                    </div>
 
-                    {/* 프로그레스 바 */}
-                    <div className="h-1 rounded-full mb-4" style={{ background: "var(--bg-warm)" }}>
-                      <div className="h-full rounded-full transition-all" style={{ width: `${branch.pct}%`, background: statusColor }} />
-                    </div>
+                        {/* 프로그레스 바 */}
+                        <div className="h-1.5 rounded-full mb-4" style={{ background: "var(--bg-warm)" }}>
+                          <div className="h-full rounded-full transition-all" style={{ width: `${branch.pct}%`, background: statusColor }} />
+                        </div>
 
-                    {/* 단계 칩 */}
-                    <div className="flex gap-1.5 flex-wrap">
-                      {CURRICULUM_STEPS.map(step => {
-                        const done = branch.branchRecords.some(r => r.step === step.id && r.passed);
-                        return (
-                          <div key={step.id} className="w-8 h-8 rounded-lg flex items-center justify-center text-xs font-bold" style={{ background: done ? "var(--success-bg)" : "var(--bg-warm)", color: done ? "var(--success)" : "var(--text-muted)", opacity: done ? 1 : 0.4 }}>
-                            {step.id}
-                          </div>
-                        );
-                      })}
-                    </div>
+                        {/* 단계 칩 */}
+                        <div className="flex gap-1.5 flex-wrap mb-3">
+                          {CURRICULUM_STEPS.map(step => {
+                            const done = branch.branchRecords.some(r => r.step === step.id && r.passed);
+                            return (
+                              <div key={step.id} className="w-8 h-8 rounded-lg flex items-center justify-center text-xs font-bold" style={{ background: done ? "var(--success-bg)" : "var(--bg-warm)", color: done ? "var(--success)" : "var(--text-muted)", opacity: done ? 1 : 0.4 }}>
+                                {step.id}
+                              </div>
+                            );
+                          })}
+                        </div>
+
+                        {/* 상세 보기 버튼 */}
+                        <button className="w-full py-2.5 rounded-xl text-xs font-semibold border hover:opacity-80 transition-opacity cursor-pointer" style={{ borderColor: statusBorder, color: statusColor, background: statusBg }} onClick={() => router.push(`/branch/${branch.id}`)}>
+                          상세 보기 →
+                        </button>
+                      </div>
+                    )}
                   </div>
                 );
               })}

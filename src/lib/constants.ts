@@ -117,10 +117,12 @@ export const CURRICULUM_STEPS = [
     label: '9단계 - 포스 & 정산',
     short: '포스·정산',
     checklist: [
-      { id: 'c9_1', label: 'POS 기본 조작 (주문 입력, 결제)', required: true },
-      { id: 'c9_2', label: '카드/현금/간편결제 처리', required: false },
-      { id: 'c9_3', label: '일일 매출 정산 방법', required: false },
-      { id: 'c9_4', label: '영수증 관리 및 환불 처리', required: false },
+      { id: 'c9_1', label: '메인 포스기 개점·주문·결제 조작', required: true },
+      { id: 'c9_2', label: '결제 유형별 처리 (카드/현금/복합/모바일)', required: false },
+      { id: 'c9_3', label: '반품(취소)·영수증·현금영수증 처리', required: false },
+      { id: 'c9_4', label: '마감 정산 및 마감 취소', required: false },
+      { id: 'c9_5', label: '테이블 오더 관리자 모드 및 테블릿 관리', required: false },
+      { id: 'c9_6', label: '테이블 오더 결제 (개인/더치페이)', required: false },
     ],
   },
   {
