@@ -23,6 +23,7 @@ export default function DashboardPage() {
   const [reviewComment, setReviewComment] = useState("");
   const [reviewSaving, setReviewSaving] = useState(false);
   const [expandedBranch, setExpandedBranch] = useState<string | null>(null);
+  const [expandedRequest, setExpandedRequest] = useState<string | null>(null);
 
   useEffect(() => {
     async function fetchData() {
@@ -126,37 +127,66 @@ export default function DashboardPage() {
         </div>
 
         {/* 교육 진행 중 */}
-        {requests.length > 0 && (
-          <div className="mb-6">
-            <h2 className="text-[15px] font-bold mb-3 flex items-center gap-2">
-              교육 진행 중
-              <span className="text-xs font-semibold px-2 py-0.5 rounded-full text-white" style={{ background: "#3498db" }}>{requests.length}</span>
-            </h2>
-            {requests.map(req => {
-              const reqBranch = branches.find(b => b.id === req.branch_id);
-              const stepInfo = CURRICULUM_STEPS.find(s => s.id === req.step);
-              return (
-                <div key={req.id} className="bg-white rounded-2xl p-4 mb-2 border shadow-sm cursor-pointer hover:shadow-md transition-shadow" style={{ borderColor: "rgba(52,152,219,0.3)", borderLeftWidth: 4, borderLeftColor: "#3498db" }} onClick={() => { setReviewModal(req); setReviewComment(""); }}>
-                  <div className="flex justify-between items-center">
-                    <div>
-                      <p className="text-[14px] font-bold">{reqBranch?.name || "알 수 없는 지점"}</p>
-                      <p className="text-xs mt-0.5" style={{ color: "var(--text-muted)" }}>{stepInfo?.label} · {reqBranch?.owner_name}</p>
+        {requests.length > 0 && (() => {
+          const grouped = requests.reduce<{ [branchId: string]: CompletionRequest[] }>((acc, req) => {
+            if (!acc[req.branch_id]) acc[req.branch_id] = [];
+            acc[req.branch_id].push(req);
+            return acc;
+          }, {});
+
+          return (
+            <div className="mb-6">
+              <h2 className="text-[15px] font-bold mb-3 flex items-center gap-2">
+                교육 진행 중
+                <span className="text-xs font-semibold px-2 py-0.5 rounded-full text-white" style={{ background: "#3498db" }}>{requests.length}</span>
+              </h2>
+              {Object.entries(grouped).map(([branchId, branchReqs]) => {
+                const reqBranch = branches.find(b => b.id === branchId);
+                const isExpanded = expandedRequest === branchId;
+                return (
+                  <div key={branchId} className="bg-white rounded-2xl mb-2 border shadow-sm overflow-hidden" style={{ borderColor: "rgba(52,152,219,0.3)", borderLeftWidth: 4, borderLeftColor: "#3498db" }}>
+                    {/* 접힌 상태: 지점명 + 건수 */}
+                    <div className="p-4 cursor-pointer hover:bg-gray-50 transition-colors flex justify-between items-center" onClick={() => setExpandedRequest(isExpanded ? null : branchId)}>
+                      <div className="flex items-center gap-2">
+                        <p className="text-[15px] font-bold">{reqBranch?.name || "알 수 없는 지점"}</p>
+                        <span className="text-[11px] font-semibold px-2 py-0.5 rounded-full" style={{ background: "rgba(52,152,219,0.1)", color: "#3498db" }}>{branchReqs.length}건 대기</span>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <span className="text-xs" style={{ color: "var(--text-muted)" }}>{reqBranch?.owner_name}</span>
+                        <span className="text-xs transition-transform" style={{ color: "var(--text-muted)", transform: isExpanded ? "rotate(180deg)" : "rotate(0deg)" }}>▼</span>
+                      </div>
                     </div>
-                    <div className="text-right">
-                      <span className="text-[11px] font-semibold px-2 py-1 rounded-full" style={{ background: "rgba(52,152,219,0.1)", color: "#3498db" }}>평가 대기</span>
-                      <p className="text-[10px] mt-1" style={{ color: "var(--text-muted)" }}>{new Date(req.created_at).toLocaleDateString("ko-KR")} 시작</p>
-                    </div>
+
+                    {/* 펼친 상태: 단계별 요청 목록 */}
+                    {isExpanded && (
+                      <div className="px-4 pb-3 border-t" style={{ borderColor: "rgba(52,152,219,0.15)" }}>
+                        {branchReqs.map(req => {
+                          const stepInfo = CURRICULUM_STEPS.find(s => s.id === req.step);
+                          return (
+                            <div key={req.id} className="mt-3 p-3 rounded-xl cursor-pointer hover:opacity-80 transition-opacity" style={{ background: "rgba(52,152,219,0.04)", border: "1px solid rgba(52,152,219,0.12)" }} onClick={() => { setReviewModal(req); setReviewComment(""); }}>
+                              <div className="flex justify-between items-center">
+                                <div>
+                                  <p className="text-[13px] font-semibold">{stepInfo?.label}</p>
+                                  <p className="text-[10px] mt-0.5" style={{ color: "var(--text-muted)" }}>{new Date(req.created_at).toLocaleDateString("ko-KR")} 시작</p>
+                                </div>
+                                <span className="text-[11px] font-semibold px-2 py-1 rounded-full" style={{ background: "rgba(52,152,219,0.1)", color: "#3498db" }}>평가하기 →</span>
+                              </div>
+                              {req.owner_message && (
+                                <div className="text-xs mt-2 p-2 rounded-lg" style={{ background: "var(--bg-warm)", color: "var(--text-secondary)" }}>
+                                  <span className="font-semibold">점주 어려웠던 점:</span> {req.owner_message}
+                                </div>
+                              )}
+                            </div>
+                          );
+                        })}
+                      </div>
+                    )}
                   </div>
-                  {req.owner_message && (
-                    <div className="text-xs mt-2 p-2 rounded-lg" style={{ background: "var(--bg-warm)", color: "var(--text-secondary)" }}>
-                      <span className="font-semibold">점주 어려웠던 점:</span> {req.owner_message}
-                    </div>
-                  )}
-                </div>
-              );
-            })}
-          </div>
-        )}
+                );
+              })}
+            </div>
+          );
+        })()}
 
         {/* 교육 현황 */}
         {(() => {
