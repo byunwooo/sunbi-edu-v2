@@ -3,6 +3,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { Eye, EyeOff } from "lucide-react";
 import { supabase } from "@/lib/supabase";
+import Image from "next/image";
 
 export default function LoginPage() {
   const router = useRouter();
@@ -39,7 +40,7 @@ export default function LoginPage() {
       <div className="w-full max-w-[400px] relative z-10">
         <div className="text-center mb-10">
           <div className="inline-block rounded-full p-3 mb-4" style={{ background: "var(--bg)" }}>
-            <img src="/logo.jpeg" alt="선비칼국수 로고" className="w-[80px] h-auto rounded-full" style={{ mixBlendMode: "multiply" }} />
+            <Image src="/logo.jpeg" alt="선비칼국수 로고" width={80} height={80} className="rounded-full" style={{ mixBlendMode: "multiply" }} />
           </div>
           <h1 className="text-2xl font-extrabold" style={{ color: "var(--primary)" }}>선비칼국수</h1>
           <div className="w-7 h-0.5 mx-auto my-3 rounded" style={{ background: "var(--primary)", opacity: 0.25 }} />

@@ -26,6 +26,7 @@ export default function OwnerPage() {
   const [requestModal, setRequestModal] = useState<number | null>(null);
   const [requestMsg, setRequestMsg] = useState("");
   const [requestSaving, setRequestSaving] = useState(false);
+  const [startingStep, setStartingStep] = useState<number | null>(null);
 
   useEffect(() => {
     if (!user) return;
@@ -94,7 +95,12 @@ export default function OwnerPage() {
 
   // 교육 시작 (모달 없이 바로)
   const startEducation = async (step: number) => {
-    if (!user || !branch) return;
+    if (!user || !branch || startingStep === step) return;
+    // 이미 진행 중인 요청이 있으면 차단
+    if (requests.some(r => r.step === step && r.status === "pending")) return;
+    // 이미 이수한 단계면 차단
+    if (records.some(r => r.step === step && r.passed)) return;
+    setStartingStep(step);
     const { data, error } = await supabase.from("completion_requests").insert({
       branch_id: branch.id,
       step,
@@ -107,6 +113,7 @@ export default function OwnerPage() {
     } else if (data) {
       setRequests(prev => [...prev, data]);
     }
+    setStartingStep(null);
   };
 
   // 어려웠던 점 저장 (모달에서)
@@ -264,9 +271,14 @@ export default function OwnerPage() {
                             <div className="text-[11px] leading-relaxed whitespace-pre-wrap font-[inherit]">
                               {section.content.split('\n').map((line, li) => {
                                 const isImportant = line.includes('★');
+                                const isGarnish = line.trimStart().startsWith('고명:');
                                 const displayLine = line.replace(/★/g, '');
                                 return (
-                                  <span key={li} style={{ color: isImportant ? "var(--danger)" : "var(--text-secondary)", fontWeight: isImportant ? 700 : 400 }}>
+                                  <span key={li} style={{
+                                    color: isImportant ? "var(--danger)" : isGarnish ? "#b45309" : "var(--text-secondary)",
+                                    fontWeight: isImportant ? 700 : isGarnish ? 600 : 400,
+                                    fontSize: isGarnish ? "10px" : undefined,
+                                  }}>
                                     {isImportant && '⚠ '}{displayLine}{'\n'}
                                   </span>
                                 );

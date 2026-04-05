@@ -60,7 +60,7 @@ export const CURRICULUM_STEPS = [
       { name: '식기세척기', usage: '집기류 세척' },
       { name: '세척씽크대', usage: '세척용' },
       { name: '전기만두찜기', usage: '만두 찜용' },
-      { name: '믹서기', usage: '무즙, 양파/무 갈기' },
+      { name: '믹서기', usage: '무즙, 무 갈기' },
       { name: '전기밥솥', usage: '홀 셀프바 밥' },
       { name: '작업대', usage: '조리 작업용' },
       { name: '벽선반', usage: '건조 식자재/소모품 보관' },

@@ -2,7 +2,7 @@
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase";
-import { CURRICULUM_STEPS, type Branch, type Record } from "@/lib/constants";
+import { CURRICULUM_STEPS, type Branch, type Record, type CompletionRequest } from "@/lib/constants";
 import { useAuth, canEdit } from "@/lib/auth-context";
 
 export default function OverviewPage() {
@@ -10,6 +10,7 @@ export default function OverviewPage() {
   const { role } = useAuth();
   const [branches, setBranches] = useState<Branch[]>([]);
   const [records, setRecords] = useState<Record[]>([]);
+  const [requests, setRequests] = useState<CompletionRequest[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
   const [tab, setTab] = useState<"all"|"progress"|"complete">("all");
@@ -23,8 +24,10 @@ export default function OverviewPage() {
       setLoading(true);
       const { data: branchData } = await supabase.from("branches").select("*");
       const { data: recordData } = await supabase.from("records").select("*");
+      const { data: requestData } = await supabase.from("completion_requests").select("*");
       setBranches(branchData || []);
       setRecords(recordData || []);
+      setRequests(requestData || []);
       setLoading(false);
     }
     fetchData();
@@ -49,16 +52,27 @@ export default function OverviewPage() {
   const completedCount = branchData.filter(b => b.isComplete).length;
   const progressCount = branchData.filter(b => !b.isComplete).length;
 
-  // 단계별 통계
+  // 단계별 통계 (completion_requests 기준 반려율)
   const stepStats = CURRICULUM_STEPS.map(step => {
     const stepRecords = records.filter(r => r.step === step.id);
     const passed = stepRecords.filter(r => r.passed).length;
     const failed = stepRecords.filter(r => !r.passed).length;
     const scores = stepRecords.filter(r => r.score).map(r => r.score!);
     const avg = scores.length > 0 ? (scores.reduce((a, b) => a + b, 0) / scores.length).toFixed(1) : "-";
-    const failRate = (passed + failed) > 0 ? Math.round((failed / (passed + failed)) * 100) : 0;
-    return { ...step, total: stepRecords.length, passed, failed, avg, failRate };
+    const stepRequests = requests.filter(r => r.step === step.id);
+    const rejectedCount = stepRequests.filter(r => r.status === "rejected").length;
+    const totalReviewed = stepRequests.filter(r => r.status === "approved" || r.status === "rejected").length;
+    const failRate = totalReviewed > 0 ? Math.round((rejectedCount / totalReviewed) * 100) : 0;
+    return { ...step, total: stepRecords.length, passed, failed, avg, failRate, rejectedCount };
   });
+
+  // 전체 통계
+  const totalRejected = requests.filter(r => r.status === "rejected").length;
+  const totalPending = requests.filter(r => r.status === "pending").length;
+  const completedRecordsWithTime = records.filter(r => r.passed && r.started_at);
+  const avgDays = completedRecordsWithTime.length > 0
+    ? Math.round(completedRecordsWithTime.reduce((sum, r) => sum + Math.max(1, Math.ceil((new Date(r.created_at).getTime() - new Date(r.started_at).getTime()) / (1000 * 60 * 60 * 24))), 0) / completedRecordsWithTime.length)
+    : 0;
 
   const runGlobalAnalysis = async () => {
     if (records.length === 0) { setAiError("분석할 교육 기록이 없습니다."); return; }
@@ -105,7 +119,7 @@ export default function OverviewPage() {
 
       <main className="max-w-xl mx-auto px-5 py-6">
         {/* 요약 카드 */}
-        <div className="grid grid-cols-3 gap-2 mb-5">
+        <div className="grid grid-cols-3 gap-2 mb-3">
           <div className="rounded-2xl p-4 text-center shadow-md" style={{ background: "var(--primary)" }}>
             <p className="text-2xl font-extrabold text-white">{branchData.length}</p>
             <p className="text-xs text-white/70 mt-0.5">전체 지점</p>
@@ -119,9 +133,29 @@ export default function OverviewPage() {
             <p className="text-xs text-white/70 mt-0.5">진행 중</p>
           </div>
         </div>
+        <div className="grid grid-cols-3 gap-2 mb-5">
+          <div className="rounded-2xl p-3 text-center bg-white border shadow-sm" style={{ borderColor: "var(--border-light)" }}>
+            <p className="text-lg font-extrabold" style={{ color: "#3498db" }}>{totalPending}</p>
+            <p className="text-[10px]" style={{ color: "var(--text-muted)" }}>평가 대기</p>
+          </div>
+          <div className="rounded-2xl p-3 text-center bg-white border shadow-sm" style={{ borderColor: "var(--border-light)" }}>
+            <p className="text-lg font-extrabold" style={{ color: "var(--danger)" }}>{totalRejected}</p>
+            <p className="text-[10px]" style={{ color: "var(--text-muted)" }}>총 반려</p>
+          </div>
+          <div className="rounded-2xl p-3 text-center bg-white border shadow-sm" style={{ borderColor: "var(--border-light)" }}>
+            <p className="text-lg font-extrabold" style={{ color: "var(--primary)" }}>{avgDays > 0 ? `${avgDays}일` : "-"}</p>
+            <p className="text-[10px]" style={{ color: "var(--text-muted)" }}>단계당 평균</p>
+          </div>
+        </div>
 
         {/* 단계별 현황 테이블 */}
-        <h2 className="text-[15px] font-bold mb-3">단계별 현황</h2>
+        <h2 className="text-[15px] font-bold mb-2">단계별 현황</h2>
+        <div className="flex items-center gap-3 mb-3 text-[10px]" style={{ color: "var(--text-muted)" }}>
+          <span><span style={{ color: "var(--success)" }}>●</span> 이수</span>
+          <span><span style={{ color: "var(--danger)" }}>●</span> 반려</span>
+          <span>반려율</span>
+          <span style={{ color: "var(--primary)" }}>평균점수</span>
+        </div>
         <div className="bg-white rounded-xl border mb-5 overflow-hidden" style={{ borderColor: "var(--border-light)" }}>
           {stepStats.map((step, i) => (
             <div key={step.id} className={`flex items-center px-4 py-3 ${i > 0 ? "border-t" : ""}`} style={{ borderColor: "var(--border-light)" }}>
@@ -130,8 +164,8 @@ export default function OverviewPage() {
               </div>
               <span className="flex-1 text-sm">{step.short}</span>
               <span className="text-xs mr-2" style={{ color: "var(--success)" }}>{step.passed}</span>
-              <span className="text-xs mr-2" style={{ color: step.failed > 0 ? "var(--danger)" : "var(--text-muted)" }}>{step.failed > 0 ? `${step.failed}` : "-"}</span>
-              {step.failRate > 0 && <span className="text-[10px] px-1.5 py-0.5 rounded mr-2" style={{ background: step.failRate > 20 ? "var(--danger-bg)" : "var(--warning-bg)", color: step.failRate > 20 ? "var(--danger)" : "var(--warning)" }}>{step.failRate}%</span>}
+              <span className="text-xs mr-2" style={{ color: step.rejectedCount > 0 ? "var(--danger)" : "var(--text-muted)" }}>{step.rejectedCount > 0 ? step.rejectedCount : "-"}</span>
+              {step.failRate > 0 ? <span className="text-[10px] px-1.5 py-0.5 rounded mr-2" style={{ background: step.failRate > 20 ? "var(--danger-bg)" : "var(--warning-bg)", color: step.failRate > 20 ? "var(--danger)" : "var(--warning)" }}>{step.failRate}%</span> : <span className="mr-2 w-8" />}
               <span className="text-xs font-bold w-8 text-right" style={{ color: "var(--primary)" }}>{step.avg}</span>
             </div>
           ))}

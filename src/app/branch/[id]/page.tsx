@@ -80,6 +80,7 @@ export default function BranchDetailPage() {
       setLoading(false);
     }
     fetchData();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id]);
 
   const runAiAnalysis = async (branchInfo: Branch, recordList: Record[]) => {
@@ -296,9 +297,14 @@ export default function BranchDetailPage() {
                           <div className="text-[11px] leading-relaxed whitespace-pre-wrap font-[inherit]">
                             {section.content.split('\n').map((line, li) => {
                               const isImportant = line.includes('★');
+                              const isGarnish = line.trimStart().startsWith('고명:');
                               const displayLine = line.replace(/★/g, '');
                               return (
-                                <span key={li} style={{ color: isImportant ? "var(--danger)" : "var(--text-secondary)", fontWeight: isImportant ? 700 : 400 }}>
+                                <span key={li} style={{
+                                  color: isImportant ? "var(--danger)" : isGarnish ? "#b45309" : "var(--text-secondary)",
+                                  fontWeight: isImportant ? 700 : isGarnish ? 600 : 400,
+                                  fontSize: isGarnish ? "10px" : undefined,
+                                }}>
                                   {isImportant && '⚠ '}{displayLine}{'\n'}
                                 </span>
                               );
