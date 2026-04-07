@@ -92,7 +92,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
                   userSelect: "none",
                 }}
               >
-                {user.email} · {new Date().toLocaleDateString("ko-KR")}
+                선비칼국수
               </span>
             ))}
           </div>
