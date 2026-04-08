@@ -52,19 +52,16 @@ export default function OverviewPage() {
   const completedCount = branchData.filter(b => b.isComplete).length;
   const progressCount = branchData.filter(b => !b.isComplete).length;
 
-  // 단계별 통계 (completion_requests 기준 반려율)
-  const stepStats = CURRICULUM_STEPS.map(step => {
-    const stepRecords = records.filter(r => r.step === step.id);
-    const passed = stepRecords.filter(r => r.passed).length;
-    const failed = stepRecords.filter(r => !r.passed).length;
-    const scores = stepRecords.filter(r => r.score).map(r => r.score!);
-    const avg = scores.length > 0 ? (scores.reduce((a, b) => a + b, 0) / scores.length).toFixed(1) : "-";
-    const stepRequests = requests.filter(r => r.step === step.id);
-    const rejectedCount = stepRequests.filter(r => r.status === "rejected").length;
-    const totalReviewed = stepRequests.filter(r => r.status === "approved" || r.status === "rejected").length;
-    const failRate = totalReviewed > 0 ? Math.round((rejectedCount / totalReviewed) * 100) : 0;
-    return { ...step, total: stepRecords.length, passed, failed, avg, failRate, rejectedCount };
-  });
+  // 주의 필요 지점: 반려 이력 있거나 진행률 낮은 지점
+  const attentionBranches = branchData
+    .map(b => {
+      const branchRequests = requests.filter(r => r.branch_id === b.id);
+      const rejectedCount = branchRequests.filter(r => r.status === "rejected").length;
+      const pendingCount = branchRequests.filter(r => r.status === "pending").length;
+      return { ...b, rejectedCount, pendingCount };
+    })
+    .filter(b => b.rejectedCount > 0 || (b.pct > 0 && b.pct < 50))
+    .sort((a, b) => b.rejectedCount - a.rejectedCount || a.pct - b.pct);
 
   // 전체 통계
   const totalRejected = requests.filter(r => r.status === "rejected").length;
@@ -148,28 +145,33 @@ export default function OverviewPage() {
           </div>
         </div>
 
-        {/* 단계별 현황 테이블 */}
-        <h2 className="text-[15px] font-bold mb-2">단계별 현황</h2>
-        <div className="flex items-center gap-3 mb-3 text-[10px]" style={{ color: "var(--text-muted)" }}>
-          <span><span style={{ color: "var(--success)" }}>●</span> 이수</span>
-          <span><span style={{ color: "var(--danger)" }}>●</span> 반려</span>
-          <span>반려율</span>
-          <span style={{ color: "var(--primary)" }}>평균점수</span>
-        </div>
-        <div className="bg-white rounded-xl border mb-5 overflow-hidden" style={{ borderColor: "var(--border-light)" }}>
-          {stepStats.map((step, i) => (
-            <div key={step.id} className={`flex items-center px-4 py-3 ${i > 0 ? "border-t" : ""}`} style={{ borderColor: "var(--border-light)" }}>
-              <div className="w-6 h-6 rounded-md flex items-center justify-center text-xs font-bold mr-3" style={{ background: step.failRate > 20 ? "var(--danger-bg)" : step.passed > 0 ? "var(--success-bg)" : "var(--bg-warm)", color: step.failRate > 20 ? "var(--danger)" : step.passed > 0 ? "var(--success)" : "var(--text-muted)" }}>
-                {step.id}
-              </div>
-              <span className="flex-1 text-sm">{step.short}</span>
-              <span className="text-xs mr-2" style={{ color: "var(--success)" }}>{step.passed}</span>
-              <span className="text-xs mr-2" style={{ color: step.rejectedCount > 0 ? "var(--danger)" : "var(--text-muted)" }}>{step.rejectedCount > 0 ? step.rejectedCount : "-"}</span>
-              {step.failRate > 0 ? <span className="text-[10px] px-1.5 py-0.5 rounded mr-2" style={{ background: step.failRate > 20 ? "var(--danger-bg)" : "var(--warning-bg)", color: step.failRate > 20 ? "var(--danger)" : "var(--warning)" }}>{step.failRate}%</span> : <span className="mr-2 w-8" />}
-              <span className="text-xs font-bold w-8 text-right" style={{ color: "var(--primary)" }}>{step.avg}</span>
+        {/* 주의 필요 지점 */}
+        {attentionBranches.length > 0 && (
+          <>
+            <h2 className="text-[15px] font-bold mb-2">주의 필요</h2>
+            <div className="bg-white rounded-xl border mb-5 overflow-hidden" style={{ borderColor: "var(--border-light)" }}>
+              {attentionBranches.map((b, i) => (
+                <div key={b.id} className={`flex items-center px-4 py-3 cursor-pointer hover:bg-gray-50 ${i > 0 ? "border-t" : ""}`} style={{ borderColor: "var(--border-light)" }} onClick={() => router.push(`/branch/${b.id}`)}>
+                  <div className="flex-1">
+                    <span className="text-sm font-semibold">{b.name}</span>
+                    <div className="flex items-center gap-2 mt-1">
+                      {b.rejectedCount > 0 && (
+                        <span className="text-[11px] px-1.5 py-0.5 rounded" style={{ background: "var(--danger-bg)", color: "var(--danger)" }}>반려 {b.rejectedCount}건</span>
+                      )}
+                      {b.pendingCount > 0 && (
+                        <span className="text-[11px] px-1.5 py-0.5 rounded" style={{ background: "rgba(52,152,219,0.1)", color: "#3498db" }}>대기 {b.pendingCount}건</span>
+                      )}
+                      {b.pct > 0 && b.pct < 50 && (
+                        <span className="text-[11px] px-1.5 py-0.5 rounded" style={{ background: "var(--warning-bg)", color: "var(--warning)" }}>진행률 낮음</span>
+                      )}
+                    </div>
+                  </div>
+                  <span className="text-lg font-extrabold" style={{ color: b.rejectedCount > 0 ? "var(--danger)" : "var(--warning)" }}>{b.pct}%</span>
+                </div>
+              ))}
             </div>
-          ))}
-        </div>
+          </>
+        )}
 
         {/* AI 전체 분석 */}
         {canEdit(role) ? (
