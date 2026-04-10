@@ -29,6 +29,8 @@ export default function BranchDetailPage() {
   const [aiLoading, setAiLoading] = useState(false);
   const [aiError, setAiError] = useState("");
   const [manualStep, setManualStep] = useState<number | null>(null);
+  const [cancelConfirm, setCancelConfirm] = useState<{ step: number; recordId: string; requestId: string } | null>(null);
+  const [canceling, setCanceling] = useState(false);
 
   useEffect(() => {
     async function fetchData() {
@@ -172,6 +174,52 @@ export default function BranchDetailPage() {
     setRecords(prev => prev.map(r => r.id === recordId ? { ...r, sv_comment: editSv, owner_comment: editOwner, score: editScore } : r));
     setEditingStep(null);
     setSavingRecord(false);
+  };
+
+  const cancelEvaluation = async () => {
+    if (!cancelConfirm) return;
+    setCanceling(true);
+
+    // 1. records 테이블에서 해당 기록 삭제
+    const { error: deleteError } = await supabase
+      .from('records')
+      .delete()
+      .eq('id', cancelConfirm.recordId);
+
+    if (deleteError) {
+      alert('평가 취소에 실패했습니다.');
+      console.error(deleteError);
+      setCanceling(false);
+      return;
+    }
+
+    // 2. completion_requests 상태를 pending으로 되돌리기
+    const { error: updateError } = await supabase
+      .from('completion_requests')
+      .update({
+        status: 'pending',
+        reviewer_id: null,
+        reviewer_comment: '',
+        reviewed_at: null,
+      })
+      .eq('id', cancelConfirm.requestId);
+
+    if (updateError) {
+      alert('요청 상태 복원에 실패했습니다.');
+      console.error(updateError);
+      setCanceling(false);
+      return;
+    }
+
+    // 3. 로컬 상태 업데이트
+    setRecords(prev => prev.filter(r => r.id !== cancelConfirm.recordId));
+    setCompletionRequests(prev => prev.map(r =>
+      r.id === cancelConfirm.requestId
+        ? { ...r, status: 'pending' as const, reviewer_id: null, reviewer_comment: '', reviewed_at: null }
+        : r
+    ));
+    setCancelConfirm(null);
+    setCanceling(false);
   };
 
   const saveFinalComment = async () => {
@@ -387,9 +435,26 @@ export default function BranchDetailPage() {
                     <p className="text-xs" style={{ color: "var(--text-muted)" }}>코멘트 없음</p>
                   )}
                   {canEdit(role) && (
-                    <button className="text-xs font-semibold mt-2 hover:opacity-70 cursor-pointer" style={{ color: "var(--primary)" }} onClick={() => startEdit(step.id, latestRecord)}>
-                      코멘트 수정
-                    </button>
+                    <div className="flex gap-3 mt-2">
+                      <button className="text-xs font-semibold hover:opacity-70 cursor-pointer" style={{ color: "var(--primary)" }} onClick={() => startEdit(step.id, latestRecord)}>
+                        코멘트 수정
+                      </button>
+                      {(() => {
+                        const matchingRequest = completionRequests
+                          .filter(r => r.step === step.id && (r.status === 'approved' || r.status === 'rejected'))
+                          .sort((a, b) => new Date(b.reviewed_at || b.created_at).getTime() - new Date(a.reviewed_at || a.created_at).getTime())[0];
+                        if (!matchingRequest) return null;
+                        return (
+                          <button
+                            className="text-xs font-semibold hover:opacity-70 cursor-pointer"
+                            style={{ color: "var(--danger)" }}
+                            onClick={() => setCancelConfirm({ step: step.id, recordId: latestRecord.id, requestId: matchingRequest.id })}
+                          >
+                            평가 취소
+                          </button>
+                        );
+                      })()}
+                    </div>
                   )}
                 </div>
               )}
@@ -497,6 +562,39 @@ export default function BranchDetailPage() {
           </>
         )}
       </main>
+
+      {/* 평가 취소 확인 모달 */}
+      {cancelConfirm && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-5" style={{ background: "rgba(0,0,0,0.5)" }}>
+          <div className="bg-white rounded-2xl p-6 w-full max-w-sm">
+            <h2 className="text-lg font-extrabold mb-2">평가 취소</h2>
+            <p className="text-sm mb-1" style={{ color: "var(--text-secondary)" }}>
+              <span className="font-semibold">{branch.name}</span>의 <span className="font-semibold" style={{ color: "var(--primary)" }}>{CURRICULUM_STEPS.find(s => s.id === cancelConfirm.step)?.label}</span>
+            </p>
+            <p className="text-sm mb-5" style={{ color: "var(--text-muted)" }}>
+              평가 결과를 취소하고 다시 평가할 수 있도록 되돌리시겠습니까?
+            </p>
+            <div className="grid grid-cols-2 gap-2">
+              <button
+                className="py-3 rounded-xl font-semibold border text-[14px] hover:opacity-80 transition-opacity cursor-pointer"
+                style={{ borderColor: "var(--border)", color: "var(--text-muted)" }}
+                onClick={() => setCancelConfirm(null)}
+                disabled={canceling}
+              >
+                닫기
+              </button>
+              <button
+                className="py-3 rounded-xl font-bold text-white text-[14px] shadow-sm hover:opacity-90 transition-opacity cursor-pointer"
+                style={{ background: "var(--danger)" }}
+                onClick={cancelEvaluation}
+                disabled={canceling}
+              >
+                {canceling ? "처리 중..." : "평가 취소"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
