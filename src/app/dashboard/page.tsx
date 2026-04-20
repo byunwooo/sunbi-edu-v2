@@ -3,8 +3,9 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState, useEffect } from "react";
 import { supabase } from "@/lib/supabase";
-import { CURRICULUM_STEPS, type Branch, type Record, type CompletionRequest } from "@/lib/constants";
+import { type Branch, type Record, type CompletionRequest } from "@/lib/constants";
 import { useAuth } from "@/lib/auth-context";
+import { useCurriculum } from "@/lib/use-curriculum";
 
 function getToday() {
   const d = new Date();
@@ -15,6 +16,7 @@ function getToday() {
 export default function DashboardPage() {
   const router = useRouter();
   const { user, role, signOut } = useAuth();
+  const { curriculum } = useCurriculum();
   const [branches, setBranches] = useState<Branch[]>([]);
   const [records, setRecords] = useState<Record[]>([]);
   const [requests, setRequests] = useState<CompletionRequest[]>([]);
@@ -31,17 +33,18 @@ export default function DashboardPage() {
   useEffect(() => {
     async function fetchData() {
       setLoading(true);
-      const { data: branchData, error: branchError } = await supabase.from('branches').select('*');
-      if (branchError) { alert('지점 데이터를 불러오는데 실패했습니다.'); console.error(branchError); }
+      const [branchRes, recordRes, requestRes] = await Promise.all([
+        supabase.from('branches').select('*'),
+        supabase.from('records').select('*'),
+        supabase.from('completion_requests').select('*').eq('status', 'pending'),
+      ]);
 
-      const { data: recordData, error: recordError } = await supabase.from('records').select('*');
-      if (recordError) { alert('기록 데이터를 불러오는데 실패했습니다.'); console.error(recordError); }
+      if (branchRes.error) { alert('지점 데이터를 불러오는데 실패했습니다.'); }
+      if (recordRes.error) { alert('기록 데이터를 불러오는데 실패했습니다.'); }
 
-      const { data: requestData } = await supabase.from('completion_requests').select('*').eq('status', 'pending');
-
-      setBranches(branchData || []);
-      setRecords(recordData || []);
-      setRequests(requestData || []);
+      setBranches(branchRes.data || []);
+      setRecords(recordRes.data || []);
+      setRequests(requestRes.data || []);
       setLoading(false);
     }
     fetchData();
@@ -158,7 +161,7 @@ export default function DashboardPage() {
                     {isExpanded && (
                       <div className="px-4 pb-3 border-t" style={{ borderColor: "rgba(52,152,219,0.15)" }}>
                         {branchReqs.map(req => {
-                          const stepInfo = CURRICULUM_STEPS.find(s => s.id === req.step);
+                          const stepInfo = curriculum.find(s => s.id === req.step);
                           return (
                             <div key={req.id} className="mt-3 p-3 rounded-xl cursor-pointer hover:opacity-80 transition-opacity" style={{ background: "rgba(52,152,219,0.04)", border: "1px solid rgba(52,152,219,0.12)" }} onClick={() => { const prevRecord = records.filter(r => r.branch_id === req.branch_id && r.step === req.step).sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())[0]; setReviewModal(req); setReviewComment(""); setReviewChecklist(prevRecord?.checklist_status || {}); }}>
                               <div className="flex justify-between items-center">
@@ -190,7 +193,7 @@ export default function DashboardPage() {
           const branchList = branches.map(branch => {
             const branchRecords = records.filter(r => r.branch_id === branch.id);
             const completedSteps = new Set(branchRecords.filter(r => r.passed).map(r => r.step)).size;
-            const pct = Math.round((completedSteps / CURRICULUM_STEPS.length) * 100);
+            const pct = Math.round((completedSteps / curriculum.length) * 100);
             const status = pct >= 100 ? "complete" : pct > 0 ? "progress" : "notStarted";
             return { ...branch, branchRecords, completedSteps, pct, status };
           });
@@ -260,7 +263,7 @@ export default function DashboardPage() {
                       <div className="px-4 pb-4 border-t" style={{ borderColor: "var(--border-light)" }}>
                         <div className="flex justify-between items-center mt-3 mb-3">
                           <p className="text-xs" style={{ color: "var(--text-muted)" }}>{branch.owner_name} · {branch.branchRecords.length}건 기록</p>
-                          <p className="text-xs font-semibold" style={{ color: statusColor }}>{branch.completedSteps}/{CURRICULUM_STEPS.length}단계</p>
+                          <p className="text-xs font-semibold" style={{ color: statusColor }}>{branch.completedSteps}/{curriculum.length}단계</p>
                         </div>
 
                         {/* 프로그레스 바 */}
@@ -270,7 +273,7 @@ export default function DashboardPage() {
 
                         {/* 단계 칩 */}
                         <div className="flex gap-1.5 flex-wrap mb-3">
-                          {CURRICULUM_STEPS.map(step => {
+                          {curriculum.map(step => {
                             const done = branch.branchRecords.some(r => r.step === step.id && r.passed);
                             return (
                               <div key={step.id} className="w-8 h-8 rounded-lg flex items-center justify-center text-xs font-bold" style={{ background: done ? "var(--success-bg)" : "var(--bg-warm)", color: done ? "var(--success)" : "var(--text-muted)", opacity: done ? 1 : 0.4 }}>
@@ -303,12 +306,12 @@ export default function DashboardPage() {
               {branches.find(b => b.id === reviewModal.branch_id)?.name} · {branches.find(b => b.id === reviewModal.branch_id)?.owner_name}
             </p>
             <p className="text-sm font-semibold mb-3" style={{ color: "var(--primary)" }}>
-              {CURRICULUM_STEPS.find(s => s.id === reviewModal.step)?.label}
+              {curriculum.find(s => s.id === reviewModal.step)?.label}
             </p>
 
             {/* 해당 단계 체크리스트 — SV가 직접 체크 */}
             {(() => {
-              const step = CURRICULUM_STEPS.find(s => s.id === reviewModal.step);
+              const step = curriculum.find(s => s.id === reviewModal.step);
               if (!step) return null;
               const requiredIds = step.checklist.filter(i => i.required).map(i => i.id);
               const allRequiredChecked = requiredIds.every(id => reviewChecklist[id]);
@@ -354,7 +357,7 @@ export default function DashboardPage() {
             />
 
             {(() => {
-              const step = CURRICULUM_STEPS.find(s => s.id === reviewModal.step);
+              const step = curriculum.find(s => s.id === reviewModal.step);
               const requiredIds = step?.checklist.filter(i => i.required).map(i => i.id) || [];
               const allRequiredChecked = requiredIds.every(id => reviewChecklist[id]);
               return (

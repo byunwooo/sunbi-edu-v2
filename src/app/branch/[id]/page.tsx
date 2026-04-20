@@ -2,81 +2,77 @@
 import { useState, useEffect } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase";
-import { CURRICULUM_STEPS, type Branch, type Record, type FinalComment, type CompletionRequest } from "@/lib/constants";
+import { type Branch, type Record, type FinalComment, type CompletionRequest } from "@/lib/constants";
+import { useCurriculum } from "@/lib/use-curriculum";
 import { useAuth, canEdit } from "@/lib/auth-context";
-import { MANUAL_CONTENT } from "@/lib/manual-content";
-import { BookOpen } from "lucide-react";
+import StepCard from "@/components/branch/StepCard";
+import FinalCommentSection from "@/components/branch/FinalCommentSection";
+import AiAnalysisSection from "@/components/branch/AiAnalysisSection";
+import CancelConfirmModal from "@/components/branch/CancelConfirmModal";
 
 export default function BranchDetailPage() {
   const { id } = useParams();
   const router = useRouter();
   const { role } = useAuth();
+  const { curriculum } = useCurriculum();
+
+  // 데이터 상태
   const [branch, setBranch] = useState<Branch | null>(null);
   const [records, setRecords] = useState<Record[]>([]);
   const [completionRequests, setCompletionRequests] = useState<CompletionRequest[]>([]);
   const [finalComment, setFinalComment] = useState<FinalComment | null>(null);
   const [loading, setLoading] = useState(true);
+
+  // 코멘트 수정 상태
   const [editingStep, setEditingStep] = useState<number | null>(null);
   const [editSv, setEditSv] = useState("");
   const [editOwner, setEditOwner] = useState("");
   const [editScore, setEditScore] = useState<number | null>(null);
+  const [savingRecord, setSavingRecord] = useState(false);
+
+  // 최종 코멘트 상태
   const [finalSv, setFinalSv] = useState("");
   const [finalOwner, setFinalOwner] = useState("");
   const [editingFinal, setEditingFinal] = useState(false);
-  const [savingRecord, setSavingRecord] = useState(false);
   const [savingFinal, setSavingFinal] = useState(false);
+
+  // AI 분석 상태
   const [aiAnalysis, setAiAnalysis] = useState("");
   const [aiLoading, setAiLoading] = useState(false);
   const [aiError, setAiError] = useState("");
+
+  // UI 상태
   const [manualStep, setManualStep] = useState<number | null>(null);
   const [cancelConfirm, setCancelConfirm] = useState<{ step: number; recordId: string; requestId: string } | null>(null);
   const [canceling, setCanceling] = useState(false);
 
+  // --- 데이터 페칭 ---
   useEffect(() => {
     async function fetchData() {
       setLoading(true);
 
-      const { data: branchData, error: branchError } = await supabase
-        .from('branches')
-        .select('*')
-        .eq('id', id)
-        .single();
-      if (branchError) { console.error(branchError); }
+      const [branchRes, recordRes, requestRes, finalRes] = await Promise.all([
+        supabase.from('branches').select('*').eq('id', id).single(),
+        supabase.from('records').select('*').eq('branch_id', id).order('created_at', { ascending: true }),
+        supabase.from('completion_requests').select('*').eq('branch_id', id).order('created_at', { ascending: true }),
+        supabase.from('final_comments').select('*').eq('branch_id', id).single(),
+      ]);
 
-      const { data: recordData, error: recordError } = await supabase
-        .from('records')
-        .select('*')
-        .eq('branch_id', id)
-        .order('created_at', { ascending: true });
-      if (recordError) { console.error(recordError); }
+      setBranch(branchRes.data || null);
+      setRecords(recordRes.data || []);
+      setCompletionRequests(requestRes.data || []);
 
-      const { data: requestData } = await supabase
-        .from('completion_requests')
-        .select('*')
-        .eq('branch_id', id)
-        .order('created_at', { ascending: true });
-
-      const { data: finalData, error: finalError } = await supabase
-        .from('final_comments')
-        .select('*')
-        .eq('branch_id', id)
-        .single();
-      if (finalError && finalError.code !== 'PGRST116') { console.error(finalError); }
-
-      setBranch(branchData || null);
-      setRecords(recordData || []);
-      setCompletionRequests(requestData || []);
-      if (finalData) {
-        setFinalComment(finalData);
-        setFinalSv(finalData.sv_comment || "");
-        setFinalOwner(finalData.owner_comment || "");
-        setAiAnalysis(finalData.ai_analysis || "");
+      if (finalRes.data) {
+        setFinalComment(finalRes.data);
+        setFinalSv(finalRes.data.sv_comment || "");
+        setFinalOwner(finalRes.data.owner_comment || "");
+        setAiAnalysis(finalRes.data.ai_analysis || "");
       }
 
-      // 교육 완료 시 AI 분석 자동 실행 (아직 분석이 없을 때만)
-      const completedCount = new Set((recordData || []).filter((r: Record) => r.passed).map((r: Record) => r.step)).size;
-      if (completedCount >= CURRICULUM_STEPS.length && branchData && (!finalData || !finalData.ai_analysis)) {
-        runAiAnalysis(branchData, recordData || []);
+      // 교육 완료 시 AI 분석 자동 실행
+      const completedCount = new Set((recordRes.data || []).filter((r: Record) => r.passed).map((r: Record) => r.step)).size;
+      if (completedCount >= curriculum.length && branchRes.data && (!finalRes.data || !finalRes.data.ai_analysis)) {
+        runAiAnalysis(branchRes.data, recordRes.data || []);
       }
 
       setLoading(false);
@@ -85,47 +81,28 @@ export default function BranchDetailPage() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id]);
 
+  // --- AI 분석 ---
   const runAiAnalysis = async (branchInfo: Branch, recordList: Record[]) => {
     setAiLoading(true);
     setAiError("");
     try {
-      const enrichedRecords = recordList.map(r => ({
-        ...r,
-        branch_id: branchInfo.name,
-      }));
-
+      const enrichedRecords = recordList.map(r => ({ ...r, branch_id: branchInfo.name }));
       const res = await fetch("/api/analyze", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          branches: [branchInfo],
-          records: enrichedRecords,
-          curriculum: CURRICULUM_STEPS,
-        }),
+        body: JSON.stringify({ branches: [branchInfo], records: enrichedRecords, curriculum: curriculum }),
       });
-
       const data = await res.json();
 
       if (!res.ok) {
-        if (data.error?.includes("credit")) {
-          setAiError("AI 크레딧이 부족합니다. 관리자에게 문의하세요.");
-        } else {
-          setAiError("AI 분석에 실패했습니다. 잠시 후 다시 시도해주세요.");
-        }
+        setAiError(data.error?.includes("credit") ? "AI 크레딧이 부족합니다. 관리자에게 문의하세요." : "AI 분석에 실패했습니다. 잠시 후 다시 시도해주세요.");
         return;
       }
 
       setAiAnalysis(data.analysis);
-
-      // DB에 AI 분석 결과 저장
-      await supabase
-        .from('final_comments')
-        .upsert({
-          branch_id: branchInfo.id,
-          sv_comment: finalSv,
-          owner_comment: finalOwner,
-          ai_analysis: data.analysis,
-        }, { onConflict: 'branch_id' });
+      await supabase.from('final_comments').upsert({
+        branch_id: branchInfo.id, sv_comment: finalSv, owner_comment: finalOwner, ai_analysis: data.analysis,
+      }, { onConflict: 'branch_id' });
     } catch {
       setAiError("AI 분석 요청에 실패했습니다.");
     } finally {
@@ -133,6 +110,58 @@ export default function BranchDetailPage() {
     }
   };
 
+  // --- 코멘트 수정 ---
+  const startEdit = (stepId: number, record: Record) => {
+    setEditingStep(stepId);
+    setEditSv(record.sv_comment);
+    setEditOwner(record.owner_comment);
+    setEditScore(record.score);
+  };
+
+  const saveEdit = async (recordId: string) => {
+    setSavingRecord(true);
+    const { error } = await supabase.from('records').update({ sv_comment: editSv, owner_comment: editOwner, score: editScore }).eq('id', recordId);
+    if (error) { alert('저장에 실패했습니다.'); console.error(error); setSavingRecord(false); return; }
+    setRecords(prev => prev.map(r => r.id === recordId ? { ...r, sv_comment: editSv, owner_comment: editOwner, score: editScore } : r));
+    setEditingStep(null);
+    setSavingRecord(false);
+  };
+
+  // --- 평가 취소 ---
+  const cancelEvaluation = async () => {
+    if (!cancelConfirm) return;
+    setCanceling(true);
+
+    const { error: deleteError } = await supabase.from('records').delete().eq('id', cancelConfirm.recordId);
+    if (deleteError) { alert('평가 취소에 실패했습니다.'); setCanceling(false); return; }
+
+    const { error: updateError } = await supabase.from('completion_requests').update({
+      status: 'pending', reviewer_id: null, reviewer_comment: '', reviewed_at: null,
+    }).eq('id', cancelConfirm.requestId);
+    if (updateError) { alert('요청 상태 복원에 실패했습니다.'); setCanceling(false); return; }
+
+    setRecords(prev => prev.filter(r => r.id !== cancelConfirm.recordId));
+    setCompletionRequests(prev => prev.map(r =>
+      r.id === cancelConfirm.requestId
+        ? { ...r, status: 'pending' as const, reviewer_id: null, reviewer_comment: '', reviewed_at: null }
+        : r
+    ));
+    setCancelConfirm(null);
+    setCanceling(false);
+  };
+
+  // --- 최종 코멘트 저장 ---
+  const saveFinalComment = async () => {
+    if (!branch) return;
+    setSavingFinal(true);
+    const { error } = await supabase.from('final_comments').upsert({ branch_id: branch.id, sv_comment: finalSv, owner_comment: finalOwner }, { onConflict: 'branch_id' });
+    if (error) { alert('최종 코멘트 저장에 실패했습니다.'); setSavingFinal(false); return; }
+    setFinalComment({ id: finalComment?.id || '', branch_id: branch.id, sv_comment: finalSv, owner_comment: finalOwner, ai_analysis: aiAnalysis, created_at: finalComment?.created_at || new Date().toISOString() });
+    setEditingFinal(false);
+    setSavingFinal(false);
+  };
+
+  // --- 렌더링 ---
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center" style={{ background: "var(--bg)" }}>
@@ -148,101 +177,8 @@ export default function BranchDetailPage() {
   );
 
   const completedStepIds = new Set(records.filter(r => r.passed).map(r => r.step));
-  const pct = Math.round((completedStepIds.size / CURRICULUM_STEPS.length) * 100);
-
-  const startEdit = (stepId: number, record: Record) => {
-    setEditingStep(stepId);
-    setEditSv(record.sv_comment);
-    setEditOwner(record.owner_comment);
-    setEditScore(record.score);
-  };
-
-  const saveEdit = async (recordId: string) => {
-    setSavingRecord(true);
-    const { error } = await supabase
-      .from('records')
-      .update({ sv_comment: editSv, owner_comment: editOwner, score: editScore })
-      .eq('id', recordId);
-
-    if (error) {
-      alert('저장에 실패했습니다.');
-      console.error(error);
-      setSavingRecord(false);
-      return;
-    }
-
-    setRecords(prev => prev.map(r => r.id === recordId ? { ...r, sv_comment: editSv, owner_comment: editOwner, score: editScore } : r));
-    setEditingStep(null);
-    setSavingRecord(false);
-  };
-
-  const cancelEvaluation = async () => {
-    if (!cancelConfirm) return;
-    setCanceling(true);
-
-    // 1. records 테이블에서 해당 기록 삭제
-    const { error: deleteError } = await supabase
-      .from('records')
-      .delete()
-      .eq('id', cancelConfirm.recordId);
-
-    if (deleteError) {
-      alert('평가 취소에 실패했습니다.');
-      console.error(deleteError);
-      setCanceling(false);
-      return;
-    }
-
-    // 2. completion_requests 상태를 pending으로 되돌리기
-    const { error: updateError } = await supabase
-      .from('completion_requests')
-      .update({
-        status: 'pending',
-        reviewer_id: null,
-        reviewer_comment: '',
-        reviewed_at: null,
-      })
-      .eq('id', cancelConfirm.requestId);
-
-    if (updateError) {
-      alert('요청 상태 복원에 실패했습니다.');
-      console.error(updateError);
-      setCanceling(false);
-      return;
-    }
-
-    // 3. 로컬 상태 업데이트
-    setRecords(prev => prev.filter(r => r.id !== cancelConfirm.recordId));
-    setCompletionRequests(prev => prev.map(r =>
-      r.id === cancelConfirm.requestId
-        ? { ...r, status: 'pending' as const, reviewer_id: null, reviewer_comment: '', reviewed_at: null }
-        : r
-    ));
-    setCancelConfirm(null);
-    setCanceling(false);
-  };
-
-  const saveFinalComment = async () => {
-    setSavingFinal(true);
-    const { error } = await supabase
-      .from('final_comments')
-      .upsert({
-        branch_id: branch.id,
-        sv_comment: finalSv,
-        owner_comment: finalOwner,
-      }, { onConflict: 'branch_id' });
-
-    if (error) {
-      alert('최종 코멘트 저장에 실패했습니다.');
-      console.error(error);
-      setSavingFinal(false);
-      return;
-    }
-
-    setFinalComment({ id: finalComment?.id || '', branch_id: branch.id, sv_comment: finalSv, owner_comment: finalOwner, ai_analysis: aiAnalysis, created_at: finalComment?.created_at || new Date().toISOString() });
-    setEditingFinal(false);
-    setSavingFinal(false);
-  };
+  const pct = Math.round((completedStepIds.size / curriculum.length) * 100);
+  const isHq = canEdit(role);
 
   return (
     <div className="min-h-screen" style={{ background: "var(--bg)" }}>
@@ -252,7 +188,7 @@ export default function BranchDetailPage() {
       </header>
 
       <main className="max-w-xl mx-auto px-5 py-6">
-        {/* 지점 정보 */}
+        {/* 지점 정보 카드 */}
         <div className="bg-white rounded-2xl p-5 mb-4 border shadow-sm" style={{ borderColor: "var(--border-light)" }}>
           <div className="flex justify-between items-start mb-4">
             <div>
@@ -263,7 +199,7 @@ export default function BranchDetailPage() {
             </div>
             <div className="text-right">
               <span className="text-3xl font-extrabold" style={{ color: pct >= 100 ? "var(--success)" : "var(--primary)" }}>{pct}%</span>
-              <p className="text-xs" style={{ color: "var(--text-muted)" }}>{completedStepIds.size}/{CURRICULUM_STEPS.length}단계</p>
+              <p className="text-xs" style={{ color: "var(--text-muted)" }}>{completedStepIds.size}/{curriculum.length}단계</p>
             </div>
           </div>
           <div className="h-1.5 rounded-full" style={{ background: "var(--bg-warm)" }}>
@@ -273,327 +209,67 @@ export default function BranchDetailPage() {
 
         {/* 커리큘럼 단계별 현황 */}
         <h3 className="text-[15px] font-bold mb-3">커리큘럼 진행 현황</h3>
-
-        {CURRICULUM_STEPS.map(step => {
-          const stepRecords = records.filter(r => r.step === step.id);
-          const passed = stepRecords.some(r => r.passed);
-          const latestRecord = stepRecords[stepRecords.length - 1];
-          const isEditing = editingStep === step.id;
-
-          return (
-            <div key={step.id} className={`bg-white rounded-xl p-4 mb-2 border ${passed ? "border-green-300" : ""}`} style={{ borderColor: passed ? undefined : "var(--border-light)" }}>
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-3">
-                  <div className="w-8 h-8 rounded-lg flex items-center justify-center text-xs font-bold" style={{
-                    background: passed ? "var(--success-bg)" : "var(--bg-warm)",
-                    color: passed ? "var(--success)" : "var(--text-muted)"
-                  }}>
-                    {step.id}
-                  </div>
-                  <div>
-                    <p className="text-sm font-semibold">{step.short}</p>
-                    <p className="text-xs" style={{ color: "var(--text-muted)" }}>
-                      {passed ? "이수 완료" : stepRecords.length > 0 ? "미이수" : "미진행"}
-                      {latestRecord?.started_at && passed && (() => {
-                        const start = new Date(latestRecord.started_at);
-                        const end = new Date(latestRecord.created_at);
-                        const days = Math.max(1, Math.ceil((end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24)) + 1);
-                        return <span style={{ color: "var(--primary)" }}> ({days}일 소요)</span>;
-                      })()}
-                    </p>
-                  </div>
-                </div>
-                {latestRecord && (
-                  <div className="text-right">
-                    {latestRecord.score && (
-                      <span className="text-lg font-bold" style={{ color: "var(--primary)" }}>{latestRecord.score}<span className="text-xs font-normal" style={{ color: "var(--text-muted)" }}>/5</span></span>
-                    )}
-                    <p className={`text-xs font-semibold ${passed ? "text-green-600" : "text-red-500"}`}>
-                      {passed ? "PASS" : "FAIL"}
-                    </p>
-                  </div>
-                )}
-                {!latestRecord && (
-                  <span className="text-xs px-2 py-1 rounded-md" style={{ background: "var(--bg-warm)", color: "var(--text-muted)" }}>대기</span>
-                )}
-              </div>
-
-              {/* 매뉴얼 학습 */}
-              <div className="mt-3">
-                <button
-                  className="w-full py-2 rounded-lg text-[12px] font-semibold flex items-center justify-center gap-2 border transition-all"
-                  style={{
-                    borderColor: manualStep === step.id ? "var(--primary)" : "var(--border-light)",
-                    background: manualStep === step.id ? "rgba(139,26,26,0.05)" : "var(--bg-warm)",
-                    color: manualStep === step.id ? "var(--primary)" : "var(--text-secondary)",
-                  }}
-                  onClick={() => setManualStep(manualStep === step.id ? null : step.id)}
-                >
-                  <BookOpen size={13} />
-                  {manualStep === step.id ? "매뉴얼 닫기" : "매뉴얼 보기"}
-                </button>
-
-                {manualStep === step.id && (() => {
-                  const manual = MANUAL_CONTENT.find(m => m.stepId === step.id);
-                  if (!manual) return null;
-                  return (
-                    <div className="mt-2 p-4 rounded-xl border" style={{ background: "rgba(139,26,26,0.02)", borderColor: "rgba(139,26,26,0.15)" }}>
-                      <p className="text-xs font-semibold mb-3" style={{ color: "var(--primary)" }}>{manual.overview}</p>
-                      {manual.sections.map(section => (
-                        <div key={section.checklistId} className="mb-3 last:mb-0">
-                          <p className="text-[12px] font-bold mb-1" style={{ color: "var(--text)" }}>{section.title}</p>
-                          <div className="text-[11px] leading-relaxed whitespace-pre-wrap font-[inherit]">
-                            {section.content.split('\n').map((line, li) => {
-                              const isImportant = line.includes('★');
-                              const isGarnish = line.trimStart().startsWith('고명:');
-                              const displayLine = line.replace(/★/g, '');
-                              return (
-                                <span key={li} style={{
-                                  color: isImportant ? "var(--danger)" : isGarnish ? "#b45309" : "var(--text-secondary)",
-                                  fontWeight: isImportant ? 700 : isGarnish ? 600 : 400,
-                                  fontSize: isGarnish ? "10px" : undefined,
-                                }}>
-                                  {isImportant && '⚠ '}{displayLine}{'\n'}
-                                </span>
-                              );
-                            })}
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  );
-                })()}
-              </div>
-
-              {/* 체크리스트 현황 */}
-              {latestRecord && latestRecord.checklist_status && (
-                <div className="mt-3 pt-3 border-t" style={{ borderColor: "var(--border-light)" }}>
-                  <div className="flex flex-wrap gap-1.5">
-                    {step.checklist.map(item => {
-                      const checked = latestRecord.checklist_status[item.id];
-                      return (
-                        <span key={item.id} className="inline-flex items-center gap-1 text-[11px] px-2 py-1 rounded-lg" style={{
-                          background: checked ? "var(--success-bg)" : "var(--bg-warm)",
-                          color: checked ? "var(--success)" : "var(--text-muted)",
-                          fontWeight: item.required ? 700 : 400,
-                        }}>
-                          {checked ? "✓" : "○"} {item.required && "★"}{item.label}
-                        </span>
-                      );
-                    })}
-                  </div>
-                </div>
-              )}
-
-              {/* 교육 이력 타임라인 */}
-              {(() => {
-                const stepRequests = completionRequests.filter(r => r.step === step.id);
-                if (stepRequests.length === 0) return null;
-                return (
-                  <div className="mt-3 pt-3 border-t" style={{ borderColor: "var(--border-light)" }}>
-                    <p className="text-[11px] font-bold mb-2" style={{ color: "var(--text-secondary)" }}>교육 이력 ({stepRequests.length}회)</p>
-                    <div className="space-y-2">
-                      {stepRequests.map((req, idx) => {
-                        const statusColor = req.status === "approved" ? "var(--success)" : req.status === "rejected" ? "var(--danger)" : "#3498db";
-                        const statusLabel = req.status === "approved" ? "이수" : req.status === "rejected" ? "반려" : "진행 중";
-                        return (
-                          <div key={req.id} className="flex gap-2.5">
-                            <div className="flex flex-col items-center">
-                              <div className="w-2 h-2 rounded-full mt-1" style={{ background: statusColor }} />
-                              {idx < stepRequests.length - 1 && <div className="w-0.5 flex-1 mt-1" style={{ background: "var(--border-light)" }} />}
-                            </div>
-                            <div className="flex-1 pb-2">
-                              <div className="flex items-center gap-2">
-                                <span className="text-[11px] font-semibold" style={{ color: statusColor }}>{statusLabel}</span>
-                                <span className="text-[10px]" style={{ color: "var(--text-muted)" }}>{new Date(req.created_at).toLocaleDateString("ko-KR")}{req.reviewed_at ? ` → ${new Date(req.reviewed_at).toLocaleDateString("ko-KR")}` : ""}</span>
-                              </div>
-                              {req.owner_message && (
-                                <p className="text-[11px] mt-0.5" style={{ color: "var(--text-muted)" }}>점주: {req.owner_message}</p>
-                              )}
-                              {req.reviewer_comment && (
-                                <p className="text-[11px] mt-0.5" style={{ color: "var(--text-secondary)" }}>SV: {req.reviewer_comment}</p>
-                              )}
-                            </div>
-                          </div>
-                        );
-                      })}
-                    </div>
-                  </div>
-                );
-              })()}
-
-              {/* 코멘트 - 읽기 모드 */}
-              {latestRecord && !isEditing && (
-                <div className="mt-3 pt-3 border-t" style={{ borderColor: "var(--border-light)" }}>
-                  {latestRecord.sv_comment && (
-                    <p className="text-xs mb-1"><span className="font-semibold" style={{ color: "var(--primary)" }}>SV:</span> <span style={{ color: "var(--text-secondary)" }}>{latestRecord.sv_comment}</span></p>
-                  )}
-                  {latestRecord.owner_comment && (
-                    <p className="text-xs"><span className="font-semibold" style={{ color: "var(--text-secondary)" }}>점주:</span> <span style={{ color: "var(--text-secondary)" }}>{latestRecord.owner_comment}</span></p>
-                  )}
-                  {!latestRecord.sv_comment && !latestRecord.owner_comment && (
-                    <p className="text-xs" style={{ color: "var(--text-muted)" }}>코멘트 없음</p>
-                  )}
-                  {canEdit(role) && (
-                    <div className="flex gap-3 mt-2">
-                      <button className="text-xs font-semibold hover:opacity-70 cursor-pointer" style={{ color: "var(--primary)" }} onClick={() => startEdit(step.id, latestRecord)}>
-                        코멘트 수정
-                      </button>
-                      {(() => {
-                        const matchingRequest = completionRequests
-                          .filter(r => r.step === step.id && (r.status === 'approved' || r.status === 'rejected'))
-                          .sort((a, b) => new Date(b.reviewed_at || b.created_at).getTime() - new Date(a.reviewed_at || a.created_at).getTime())[0];
-                        if (!matchingRequest) return null;
-                        return (
-                          <button
-                            className="text-xs font-semibold hover:opacity-70 cursor-pointer"
-                            style={{ color: "var(--danger)" }}
-                            onClick={() => setCancelConfirm({ step: step.id, recordId: latestRecord.id, requestId: matchingRequest.id })}
-                          >
-                            평가 취소
-                          </button>
-                        );
-                      })()}
-                    </div>
-                  )}
-                </div>
-              )}
-
-              {/* 코멘트 - 수정 모드 */}
-              {latestRecord && isEditing && (
-                <div className="mt-3 pt-3 border-t" style={{ borderColor: "var(--border-light)" }}>
-                  {passed && (
-                    <div className="mb-3">
-                      <label className="block text-xs font-bold mb-1.5" style={{ color: "var(--text-secondary)" }}>점수</label>
-                      <div className="flex gap-1.5">
-                        {[1,2,3,4,5].map(n => (
-                          <button key={n} className={`w-10 h-10 rounded-lg text-sm font-bold border-2 transition-all cursor-pointer ${editScore === n ? "text-white" : "border-gray-200 hover:border-gray-300"}`} style={editScore === n ? { background: "var(--primary)", borderColor: "var(--primary)" } : { color: "var(--text-muted)" }} onClick={() => setEditScore(n)}>
-                            {n}
-                          </button>
-                        ))}
-                      </div>
-                    </div>
-                  )}
-                  <label className="block text-xs font-bold mb-1" style={{ color: "var(--primary)" }}>SV 코멘트</label>
-                  <textarea className="w-full rounded-lg px-3 py-2 text-xs border resize-none mb-2" style={{ borderColor: "var(--border)", minHeight: 60 }} value={editSv} onChange={e => setEditSv(e.target.value)} placeholder="SV 코멘트를 입력하세요" />
-
-                  <label className="block text-xs font-bold mb-1" style={{ color: "var(--text-secondary)" }}>점주 코멘트</label>
-                  <textarea className="w-full rounded-lg px-3 py-2 text-xs border resize-none mb-2" style={{ borderColor: "var(--border)", minHeight: 60 }} value={editOwner} onChange={e => setEditOwner(e.target.value)} placeholder="점주 코멘트를 입력하세요" />
-
-                  <div className="flex gap-2">
-                    <button className="flex-1 py-2 rounded-lg text-xs font-semibold border hover:opacity-80 cursor-pointer" style={{ borderColor: "var(--border)", color: "var(--text-muted)" }} onClick={() => setEditingStep(null)}>취소</button>
-                    <button className="flex-1 py-2 rounded-lg text-xs font-bold text-white hover:opacity-90 cursor-pointer" style={{ background: "var(--primary)" }} onClick={() => saveEdit(latestRecord.id)} disabled={savingRecord}>{savingRecord ? "저장 중..." : "저장"}</button>
-                  </div>
-                </div>
-              )}
-            </div>
-          );
-        })}
+        {curriculum.map(step => (
+          <StepCard
+            key={step.id}
+            step={step}
+            records={records}
+            completionRequests={completionRequests}
+            manualStep={manualStep}
+            onManualToggle={(id) => setManualStep(manualStep === id ? null : id)}
+            isEditing={editingStep === step.id}
+            editSv={editSv}
+            editOwner={editOwner}
+            editScore={editScore}
+            savingRecord={savingRecord}
+            canEditRole={isHq}
+            onStartEdit={startEdit}
+            onEditSvChange={setEditSv}
+            onEditOwnerChange={setEditOwner}
+            onEditScoreChange={setEditScore}
+            onCancelEdit={() => setEditingStep(null)}
+            onSaveEdit={saveEdit}
+            onCancelConfirm={setCancelConfirm}
+          />
+        ))}
 
         {/* 최종 코멘트 */}
-        <h3 className="text-[15px] font-bold mt-6 mb-3">최종 코멘트</h3>
-        <div className="bg-white rounded-xl p-5 border" style={{ borderColor: "var(--border-light)" }}>
-          {pct >= 100 ? (
-            editingFinal ? (
-              <>
-                <label className="block text-xs font-bold mb-1" style={{ color: "var(--primary)" }}>SV 종합 평가</label>
-                <textarea className="w-full rounded-lg px-3 py-2 text-sm border resize-none mb-3" style={{ borderColor: "var(--border)", minHeight: 80 }} value={finalSv} onChange={e => setFinalSv(e.target.value)} />
+        <FinalCommentSection
+          pct={pct}
+          editingFinal={editingFinal}
+          finalSv={finalSv}
+          finalOwner={finalOwner}
+          finalComment={finalComment}
+          savingFinal={savingFinal}
+          canEditRole={isHq}
+          onFinalSvChange={setFinalSv}
+          onFinalOwnerChange={setFinalOwner}
+          onEditingFinalChange={setEditingFinal}
+          onSave={saveFinalComment}
+        />
 
-                <label className="block text-xs font-bold mb-1" style={{ color: "var(--text-secondary)" }}>점주 소감</label>
-                <textarea className="w-full rounded-lg px-3 py-2 text-sm border resize-none mb-3" style={{ borderColor: "var(--border)", minHeight: 80 }} value={finalOwner} onChange={e => setFinalOwner(e.target.value)} />
-
-                <div className="flex gap-2">
-                  <button className="flex-1 py-2.5 rounded-lg text-sm font-semibold border hover:opacity-80 cursor-pointer" style={{ borderColor: "var(--border)", color: "var(--text-muted)" }} onClick={() => setEditingFinal(false)}>취소</button>
-                  <button className="flex-1 py-2.5 rounded-lg text-sm font-bold text-white hover:opacity-90 cursor-pointer" style={{ background: "var(--primary)" }} onClick={saveFinalComment} disabled={savingFinal}>{savingFinal ? "저장 중..." : "저장"}</button>
-                </div>
-              </>
-            ) : (
-              <>
-                <div className="mb-3">
-                  <p className="text-xs font-bold mb-1" style={{ color: "var(--primary)" }}>SV 종합 평가</p>
-                  <p className="text-sm leading-relaxed" style={{ color: "var(--text-secondary)" }}>{finalSv || "아직 작성되지 않았습니다."}</p>
-                </div>
-                <div className="mb-3">
-                  <p className="text-xs font-bold mb-1" style={{ color: "var(--text-secondary)" }}>점주 소감</p>
-                  <p className="text-sm leading-relaxed" style={{ color: "var(--text-secondary)" }}>{finalOwner || "아직 작성되지 않았습니다."}</p>
-                </div>
-                {canEdit(role) && (
-                  <button className="text-xs font-semibold hover:opacity-70 cursor-pointer" style={{ color: "var(--primary)" }} onClick={() => setEditingFinal(true)}>
-                    코멘트 {finalComment ? "수정" : "작성"}
-                  </button>
-                )}
-              </>
-            )
-          ) : (
-            <p className="text-sm text-center py-4" style={{ color: "var(--text-muted)" }}>
-              모든 단계를 이수하면 최종 코멘트를 작성할 수 있습니다.
-            </p>
-          )}
-        </div>
-
-        {/* AI 분석 결과 */}
-        {pct >= 100 && (
-          <>
-            <h3 className="text-[15px] font-bold mt-6 mb-3">AI 교육 분석</h3>
-            <div className="bg-white rounded-xl border p-5" style={{ borderColor: "var(--border-light)" }}>
-              {aiLoading && (
-                <div className="text-center py-6">
-                  <p className="text-sm font-semibold" style={{ color: "var(--primary)" }}>AI가 교육 데이터를 분석하고 있습니다...</p>
-                  <p className="text-xs mt-1" style={{ color: "var(--text-muted)" }}>약 10초 소요</p>
-                </div>
-              )}
-              {aiError && (
-                <div className="p-3 rounded-lg mb-3" style={{ background: "var(--warning-bg)" }}>
-                  <p className="text-sm" style={{ color: "var(--warning)" }}>{aiError}</p>
-                  {canEdit(role) && (
-                    <button className="text-xs font-semibold mt-2 hover:opacity-70 cursor-pointer" style={{ color: "var(--primary)" }} onClick={() => branch && runAiAnalysis(branch, records)}>
-                      다시 시도
-                    </button>
-                  )}
-                </div>
-              )}
-              {aiAnalysis && !aiLoading && (
-                <div className="text-sm leading-relaxed" style={{ color: "var(--text-secondary)" }} dangerouslySetInnerHTML={{ __html: aiAnalysis.replace(/\n/g, '<br/>').replace(/##\s*(.*?)(<br\/>)/g, '<h4 style="font-size:14px;font-weight:700;color:#1a1a1a;margin-top:16px;margin-bottom:8px">$1</h4>').replace(/\*\*(.*?)\*\*/g, '<strong style="color:#1a1a1a">$1</strong>').replace(/- (.*?)(<br\/>)/g, '<div style="padding-left:12px;margin-bottom:4px">- $1</div>') }} />
-              )}
-              {!aiAnalysis && !aiLoading && !aiError && (
-                <p className="text-sm text-center py-4" style={{ color: "var(--text-muted)" }}>AI 분석 결과가 없습니다.</p>
-              )}
-            </div>
-          </>
-        )}
+        {/* AI 분석 */}
+        <AiAnalysisSection
+          pct={pct}
+          aiAnalysis={aiAnalysis}
+          aiLoading={aiLoading}
+          aiError={aiError}
+          canEditRole={isHq}
+          branch={branch}
+          records={records}
+          onRetry={runAiAnalysis}
+        />
       </main>
 
-      {/* 평가 취소 확인 모달 */}
+      {/* 평가 취소 모달 */}
       {cancelConfirm && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-5" style={{ background: "rgba(0,0,0,0.5)" }}>
-          <div className="bg-white rounded-2xl p-6 w-full max-w-sm">
-            <h2 className="text-lg font-extrabold mb-2">평가 취소</h2>
-            <p className="text-sm mb-1" style={{ color: "var(--text-secondary)" }}>
-              <span className="font-semibold">{branch.name}</span>의 <span className="font-semibold" style={{ color: "var(--primary)" }}>{CURRICULUM_STEPS.find(s => s.id === cancelConfirm.step)?.label}</span>
-            </p>
-            <p className="text-sm mb-5" style={{ color: "var(--text-muted)" }}>
-              평가 결과를 취소하고 다시 평가할 수 있도록 되돌리시겠습니까?
-            </p>
-            <div className="grid grid-cols-2 gap-2">
-              <button
-                className="py-3 rounded-xl font-semibold border text-[14px] hover:opacity-80 transition-opacity cursor-pointer"
-                style={{ borderColor: "var(--border)", color: "var(--text-muted)" }}
-                onClick={() => setCancelConfirm(null)}
-                disabled={canceling}
-              >
-                닫기
-              </button>
-              <button
-                className="py-3 rounded-xl font-bold text-white text-[14px] shadow-sm hover:opacity-90 transition-opacity cursor-pointer"
-                style={{ background: "var(--danger)" }}
-                onClick={cancelEvaluation}
-                disabled={canceling}
-              >
-                {canceling ? "처리 중..." : "평가 취소"}
-              </button>
-            </div>
-          </div>
-        </div>
+        <CancelConfirmModal
+          branchName={branch.name}
+          stepLabel={curriculum.find(s => s.id === cancelConfirm.step)?.label || `${cancelConfirm.step}단계`}
+          canceling={canceling}
+          onClose={() => setCancelConfirm(null)}
+          onConfirm={cancelEvaluation}
+        />
       )}
     </div>
   );

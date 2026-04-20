@@ -2,7 +2,8 @@
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase";
-import { CURRICULUM_STEPS, type Branch } from "@/lib/constants";
+import { type Branch } from "@/lib/constants";
+import { useCurriculum } from "@/lib/use-curriculum";
 import { useAuth, canEdit } from "@/lib/auth-context";
 
 function formatPhone(v: string) {
@@ -15,6 +16,7 @@ function formatPhone(v: string) {
 export default function BranchesPage() {
   const router = useRouter();
   const { role } = useAuth();
+  const { curriculum } = useCurriculum();
   const [branches, setBranches] = useState<Branch[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
@@ -150,9 +152,9 @@ export default function BranchesPage() {
         <p className="text-xs mb-3" style={{ color: "var(--text-muted)" }}>전체 <strong style={{ color: "var(--text)" }}>{filtered.length}개</strong> 지점</p>
 
         {filtered.map(b => {
-          const statusColor = b.last_step >= CURRICULUM_STEPS.length ? "var(--success)" : b.last_step > 0 ? "#e67e22" : "#95a5a6";
-          const statusLabel = b.last_step >= CURRICULUM_STEPS.length ? "완료" : b.last_step > 0 ? "진행 중" : "시작 전";
-          const statusBg = b.last_step >= CURRICULUM_STEPS.length ? "rgba(26,122,58,0.08)" : b.last_step > 0 ? "rgba(230,126,34,0.08)" : "rgba(149,165,166,0.08)";
+          const statusColor = b.last_step >= curriculum.length ? "var(--success)" : b.last_step > 0 ? "#e67e22" : "#95a5a6";
+          const statusLabel = b.last_step >= curriculum.length ? "완료" : b.last_step > 0 ? "진행 중" : "시작 전";
+          const statusBg = b.last_step >= curriculum.length ? "rgba(26,122,58,0.08)" : b.last_step > 0 ? "rgba(230,126,34,0.08)" : "rgba(149,165,166,0.08)";
           return (
           <div key={b.id} className="bg-white rounded-2xl p-5 mb-3 border shadow-sm flex justify-between" style={{ borderColor: "var(--border-light)", borderLeftWidth: 4, borderLeftColor: statusColor }}>
             <div>
@@ -249,7 +251,7 @@ export default function BranchesPage() {
             {!editing && branchType === "existing" && (
               <div className="mt-5">
                 <label className="block text-xs font-bold mb-2" style={{ color: "var(--text-secondary)" }}>단계별 코멘트 (선택)</label>
-                {CURRICULUM_STEPS.map(step => (
+                {curriculum.map(step => (
                   <div key={step.id} className="mb-2">
                     <label className="block text-[11px] mb-1" style={{ color: "var(--text-muted)" }}>{step.id}단계 - {step.short}</label>
                     <input

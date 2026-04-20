@@ -2,12 +2,15 @@
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase";
-import { CURRICULUM_STEPS, type Branch, type Record } from "@/lib/constants";
+import { type Branch, type Record } from "@/lib/constants";
 import { useAuth, canEdit } from "@/lib/auth-context";
+import { sanitizeAnalysis } from "@/lib/sanitize";
+import { useCurriculum } from "@/lib/use-curriculum";
 
 export default function AnalysisPage() {
   const router = useRouter();
   const { role } = useAuth();
+  const { curriculum } = useCurriculum();
   const [branches, setBranches] = useState<Branch[]>([]);
   const [records, setRecords] = useState<Record[]>([]);
   const [loading, setLoading] = useState(true);
@@ -18,10 +21,12 @@ export default function AnalysisPage() {
   useEffect(() => {
     async function fetchData() {
       setLoading(true);
-      const { data: b } = await supabase.from("branches").select("*");
-      const { data: r } = await supabase.from("records").select("*");
-      setBranches(b || []);
-      setRecords(r || []);
+      const [branchRes, recordRes] = await Promise.all([
+        supabase.from("branches").select("*"),
+        supabase.from("records").select("*"),
+      ]);
+      setBranches(branchRes.data || []);
+      setRecords(recordRes.data || []);
       setLoading(false);
     }
     fetchData();
@@ -47,7 +52,7 @@ export default function AnalysisPage() {
         body: JSON.stringify({
           branches,
           records: enrichedRecords,
-          curriculum: CURRICULUM_STEPS,
+          curriculum: curriculum,
         }),
       });
 
@@ -72,7 +77,7 @@ export default function AnalysisPage() {
     : "-";
 
   // 단계별 통계
-  const stepStats = CURRICULUM_STEPS.map(step => {
+  const stepStats = curriculum.map(step => {
     const stepRecords = records.filter(r => r.step === step.id);
     const passed = stepRecords.filter(r => r.passed).length;
     const failed = stepRecords.filter(r => !r.passed).length;
@@ -155,7 +160,7 @@ export default function AnalysisPage() {
         {analysis && (
           <div className="bg-white rounded-xl border p-5" style={{ borderColor: "var(--border-light)" }}>
             <h2 className="text-[15px] font-bold mb-4" style={{ color: "var(--primary)" }}>AI 분석 결과</h2>
-            <div className="prose prose-sm max-w-none text-sm leading-relaxed" style={{ color: "var(--text-secondary)" }} dangerouslySetInnerHTML={{ __html: analysis.replace(/\n/g, '<br/>').replace(/##\s*(.*?)(<br\/>)/g, '<h3 class="text-base font-bold mt-4 mb-2" style="color:#1a1a1a">$1</h3>').replace(/\*\*(.*?)\*\*/g, '<strong style="color:#1a1a1a">$1</strong>').replace(/- (.*?)(<br\/>)/g, '<div style="padding-left:12px;margin-bottom:4px">• $1</div>') }} />
+            <div className="prose prose-sm max-w-none text-sm leading-relaxed" style={{ color: "var(--text-secondary)" }} dangerouslySetInnerHTML={{ __html: sanitizeAnalysis(analysis) }} />
           </div>
         )}
       </main>

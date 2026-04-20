@@ -2,12 +2,15 @@
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase";
-import { CURRICULUM_STEPS, type Branch, type Record, type CompletionRequest } from "@/lib/constants";
+import { type Branch, type Record, type CompletionRequest } from "@/lib/constants";
 import { useAuth, canEdit } from "@/lib/auth-context";
+import { sanitizeAnalysis } from "@/lib/sanitize";
+import { useCurriculum } from "@/lib/use-curriculum";
 
 export default function OverviewPage() {
   const router = useRouter();
   const { role } = useAuth();
+  const { curriculum } = useCurriculum();
   const [branches, setBranches] = useState<Branch[]>([]);
   const [records, setRecords] = useState<Record[]>([]);
   const [requests, setRequests] = useState<CompletionRequest[]>([]);
@@ -22,12 +25,14 @@ export default function OverviewPage() {
   useEffect(() => {
     async function fetchData() {
       setLoading(true);
-      const { data: branchData } = await supabase.from("branches").select("*");
-      const { data: recordData } = await supabase.from("records").select("*");
-      const { data: requestData } = await supabase.from("completion_requests").select("*");
-      setBranches(branchData || []);
-      setRecords(recordData || []);
-      setRequests(requestData || []);
+      const [branchRes, recordRes, requestRes] = await Promise.all([
+        supabase.from("branches").select("*"),
+        supabase.from("records").select("*"),
+        supabase.from("completion_requests").select("*"),
+      ]);
+      setBranches(branchRes.data || []);
+      setRecords(recordRes.data || []);
+      setRequests(requestRes.data || []);
       setLoading(false);
     }
     fetchData();
@@ -36,7 +41,7 @@ export default function OverviewPage() {
   const branchData = branches.map(b => {
     const branchRecords = records.filter(r => r.branch_id === b.id);
     const completedSteps = Array.from(new Set(branchRecords.filter(r => r.passed).map(r => r.step)));
-    const pct = Math.round((completedSteps.length / CURRICULUM_STEPS.length) * 100);
+    const pct = Math.round((completedSteps.length / curriculum.length) * 100);
     const scoredRecords = branchRecords.filter(r => r.score);
     const avgScore = scoredRecords.length > 0 ? +(scoredRecords.reduce((s,r) => s + (r.score||0), 0) / scoredRecords.length).toFixed(1) : 0;
     return { ...b, completedSteps, pct, totalRecords: branchRecords.length, avgScore, isComplete: pct >= 100 };
@@ -83,7 +88,7 @@ export default function OverviewPage() {
       const res = await fetch("/api/analyze", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ branches, records: enrichedRecords, curriculum: CURRICULUM_STEPS }),
+        body: JSON.stringify({ branches, records: enrichedRecords, curriculum: curriculum }),
       });
       const data = await res.json();
       if (!res.ok) {
@@ -199,7 +204,7 @@ export default function OverviewPage() {
               <h2 className="text-[15px] font-bold" style={{ color: "var(--primary)" }}>AI 전체 분석 결과</h2>
               <button className="text-xs hover:opacity-70 cursor-pointer" style={{ color: "var(--text-muted)" }} onClick={() => setShowAnalysis(false)}>접기</button>
             </div>
-            <div className="text-sm leading-relaxed" style={{ color: "var(--text-secondary)" }} dangerouslySetInnerHTML={{ __html: aiAnalysis.replace(/\n/g, "<br/>").replace(/##\s*(.*?)(<br\/>)/g, '<h4 style="font-size:14px;font-weight:700;color:#1a1a1a;margin-top:16px;margin-bottom:8px">$1</h4>').replace(/\*\*(.*?)\*\*/g, '<strong style="color:#1a1a1a">$1</strong>').replace(/\| /g, "| ").replace(/- (.*?)(<br\/>)/g, '<div style="padding-left:12px;margin-bottom:4px">- $1</div>') }} />
+            <div className="text-sm leading-relaxed" style={{ color: "var(--text-secondary)" }} dangerouslySetInnerHTML={{ __html: sanitizeAnalysis(aiAnalysis) }} />
           </div>
         )}
 
@@ -241,7 +246,7 @@ export default function OverviewPage() {
               <div className="h-full rounded-full" style={{ width: `${b.pct}%`, background: statusColor }} />
             </div>
             <div className="flex flex-wrap gap-1.5">
-              {CURRICULUM_STEPS.map(step => {
+              {curriculum.map(step => {
                 const done = b.completedSteps.includes(step.id);
                 return (
                   <span key={step.id} className="inline-flex items-center gap-1 text-xs px-2.5 py-1 rounded-lg" style={{ background: done ? "var(--success-bg)" : "var(--bg-warm)", color: done ? "var(--success)" : "var(--text-muted)", fontWeight: done ? 600 : 400 }}>

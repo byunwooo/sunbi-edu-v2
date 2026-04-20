@@ -2,8 +2,9 @@
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase";
-import { CURRICULUM_STEPS, type Branch, type Record, type CompletionRequest } from "@/lib/constants";
+import { type Branch, type Record, type CompletionRequest } from "@/lib/constants";
 import { useAuth } from "@/lib/auth-context";
+import { useCurriculum } from "@/lib/use-curriculum";
 import { CheckCircle2, Circle, Star, ChevronDown, ChevronUp, LogOut, BookOpen, Play, Clock, XCircle, MessageSquare } from "lucide-react";
 import { MANUAL_CONTENT } from "@/lib/manual-content";
 
@@ -16,6 +17,7 @@ function getToday() {
 export default function OwnerPage() {
   const router = useRouter();
   const { user, signOut } = useAuth();
+  const { curriculum } = useCurriculum();
   const [branch, setBranch] = useState<Branch | null>(null);
   const [records, setRecords] = useState<Record[]>([]);
   const [loading, setLoading] = useState(true);
@@ -138,7 +140,7 @@ export default function OwnerPage() {
   };
 
   const completedSteps = new Set(records.filter(r => r.passed).map(r => r.step));
-  const totalSteps = CURRICULUM_STEPS.length;
+  const totalSteps = curriculum.length;
   const pct = Math.round((completedSteps.size / totalSteps) * 100);
 
   // 소요일수 계산
@@ -190,7 +192,7 @@ export default function OwnerPage() {
         {/* 단계별 커리큘럼 */}
         <h2 className="text-[15px] font-bold mb-3">단계별 교육 현황</h2>
 
-        {CURRICULUM_STEPS.map(step => {
+        {curriculum.map(step => {
           const stepRecord = records.find(r => r.step === step.id && r.passed);
           const failedRecord = records.find(r => r.step === step.id && !r.passed);
           const isCompleted = !!stepRecord;
@@ -438,7 +440,7 @@ export default function OwnerPage() {
             <div className="bg-white rounded-2xl p-6 w-full max-w-md">
               <h2 className="text-lg font-extrabold mb-1">어려웠던 점 작성</h2>
               <p className="text-sm mb-5" style={{ color: "var(--text-muted)" }}>
-                {CURRICULUM_STEPS.find(s => s.id === requestModal)?.label}
+                {curriculum.find(s => s.id === requestModal)?.label}
               </p>
 
               <label className="block text-xs font-bold mb-1" style={{ color: "var(--text-secondary)" }}>어려웠던 점</label>
