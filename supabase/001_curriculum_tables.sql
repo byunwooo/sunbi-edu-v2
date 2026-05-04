@@ -146,7 +146,7 @@ INSERT INTO checklist_items (id, step_number, label, required, sort_order) VALUE
 INSERT INTO equipment_items (step_number, name, usage, sort_order) VALUES
 (4, '제면기 + 칼국수날', '매장 직접 제면', 1),
 (4, '슬러시아', '육수 보관', 2),
-(4, '사리냉각기', '면 식히기 (콩국수, 냉국수)', 3),
+(4, '사리냉각기', '면 식히기 (콩국수, 냉칼국수, 열무비빔칼국수)', 3),
 (4, '45박스 냉장고', '주방 메인 냉장/냉동', 4),
 (4, '테이블냉동·냉장고', '작업대 겸용', 5),
 (4, '반찬냉장고', '홀용 반찬 보관', 6),

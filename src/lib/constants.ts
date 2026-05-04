@@ -50,7 +50,7 @@ export const CURRICULUM_STEPS = [
     equipment: [
       { name: '제면기 + 칼국수날', usage: '매장 직접 제면' },
       { name: '슬러시아', usage: '육수 보관' },
-      { name: '사리냉각기', usage: '면 식히기 (콩국수, 냉국수)' },
+      { name: '사리냉각기', usage: '면 식히기 (콩국수, 냉칼국수, 열무비빔칼국수)' },
       { name: '45박스 냉장고', usage: '주방 메인 냉장/냉동' },
       { name: '테이블냉동·냉장고', usage: '작업대 겸용' },
       { name: '반찬냉장고', usage: '홀용 반찬 보관' },
